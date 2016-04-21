@@ -94,19 +94,19 @@ xTaskHandle xTaskOfHandle[NUMBEROFSERVANT];         // record the handle of all 
 //portBASE_TYPE xTaskComplete[NUMBEROFTASK];  // record whether specified task completes execution
 portTickType xPeriodOfTask[NUMBEROFTASK] =
 {
-    125 ,
-    125 ,
-    250 ,
-    250 ,
-    250 ,
-    125 ,
-    250 ,
-    250 ,
-    1250,
-    1250,
-    1250,
-    1250,
-    500
+    100 ,
+    100 ,
+    200 ,
+    200 ,
+    200 ,
+    100 ,
+    200 ,
+    200 ,
+    1000,
+    1000,
+    1000,
+    1000,
+    400  
 };
 
 // the LET of all S-Servant (ms)
