@@ -106,7 +106,7 @@ portTickType xPeriodOfTask[NUMBEROFTASK] =
     1000,
     1000,
     1000,
-    400  
+    400
 };
 
 // the LET of all S-Servant (ms)

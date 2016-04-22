@@ -232,6 +232,7 @@ void vEventCreateAll( void * pvParameter, struct eventData *xDatas )
         // get all flags of destination servants
         xFlags[i] = ((struct xParam *) pvParameter)->xOutFlag[i]; 
 
+        // if current servant is the last one of task, then the event will be proceeded at the deadline
         if( xFlags[i] <= xMyFlag )
         {
             xDatas[i].IS_LAST_SERVANT = 1;
@@ -276,10 +277,10 @@ static void vDoSensor()
 void vSensor( void * pvParameter )
 {
     portTickType xCurrentTime;
-    portTickType xStartTime;
+    portTickType deadline;
     portBASE_TYPE i;
     portBASE_TYPE IS_FIRST_TIME_TO_EXE = 1;
-    portBASE_TYPE xCount = 2;
+    portBASE_TYPE xCount = 1;
 
     /* store the paramter into stack of servant */
     void * pvMyParameter = pvParameter;
@@ -332,13 +333,13 @@ void vSensor( void * pvParameter )
         vPrintNumber( xCurrentTime );
         vTaskSetxStartTime( xTaskOfHandle[xMyFlag], xCurrentTime );
 
-        // record the start time of this period.
+        // xStartTime is the start time of next period which is also the deadline of current period
         xCount ++;
-        xStartTime = xCount * xPeriod; 
+        deadline = xCount * xPeriod; 
 
         for( i = 0; i < NUM; i ++ )
         {
-            xDatas[i].xNextPeriod = xStartTime;
+            xDatas[i].xNextPeriod = deadline;
             xDatas[i].xTime = xCurrentTime + xLet;
         }
 
@@ -348,12 +349,14 @@ void vSensor( void * pvParameter )
         // this is the first s-servant
         for( i = 0; i < xFunctionTimes; ++ i )
         {
-            xMyFun( NULL, 0, xDatas, NUM);
+            //xMyFun( NULL, 0, xDatas, NUM);
         }
 
         vTaskDelayLET();
         xCurrentTime = xTaskGetTickCount();
         vPrintNumber( xCurrentTime );
+        vPrintNumber( deadline - xPeriod ); // output the ready time of task
+        vPrintNumber( deadline );  // output the deadline of task
         vPrintNumber( ( xMyFlag + 10 ) * 3 );
 
         //vPrintString("the start time of next Period: ");
@@ -384,6 +387,7 @@ void vServant( void * pvParameter )
     portBASE_TYPE xNumOfIn = ((struct xParam *) pvMyParameter)->xNumOfIn;
     portBASE_TYPE xNumOfOut = ((struct xParam *) pvMyParameter)->xNumOfOut;
     portBASE_TYPE xMyFlag = ((struct xParam *) pvMyParameter)->xMyFlag;
+    portTickType xPeriod = ((struct xParam *) pvMyParameter)->xPeriod;
     pvServantFunType xMyFun = ((struct xParam *) pvMyParameter)->xFp;
 
     xEventHandle pxEvent[xNumOfIn];
@@ -413,16 +417,12 @@ void vServant( void * pvParameter )
 
         for( i = 0; i < xFunctionTimes; ++ i )
         {
-            xMyFun(pxEvent, xNumOfIn, xDatas, xNumOfOut);
+            //xMyFun(pxEvent, xNumOfIn, xDatas, xNumOfOut);
         }
 
         vEventDeleteAll( pvMyParameter, pxEvent );        
 
         vEventCreateAll( pvMyParameter, xDatas );
-        vTaskDelayLET();
-        xCurrentTime = xTaskGetTickCount();
-        vPrintNumber( xCurrentTime );
-        vPrintNumber( (xMyFlag + 10) * 3 );
 
         if( xCurrentTime > xDatas[0].xNextPeriod )
         {
@@ -430,6 +430,16 @@ void vServant( void * pvParameter )
             vPrintNumber(xCurrentTime);
             vPrintString("there are servants missing deadline\n\r");
         }
+
+        vTaskDelayLET();
+
+        xCurrentTime = xTaskGetTickCount();
+        vPrintNumber( xCurrentTime );
+        vPrintNumber( xDatas[0].xNextPeriod - xPeriod ); // output the ready time of task
+        vPrintNumber( xDatas[0].xNextPeriod );  // output the deadline of task
+        vPrintNumber( (xMyFlag + 10) * 3 );
+
+
         // triggered R-Servant to execute 
         xSemaphoreGive( xBinarySemaphore[NUMBEROFSERVANT-1] );
         
@@ -458,9 +468,9 @@ void vR_Servant( void * pvParameter)
         // waiting for events created by tick hook or S-Servant
         xSemaphoreTake( xBinarySemaphore[xMyFlag], portMAX_DELAY );
 
-        //vPrintNumber( xMyFlag );
+        vPrintNumber( xMyFlag );
         xCurrentTime = xTaskGetTickCount();
-        //vPrintNumber( xCurrentTime );
+        vPrintNumber( xCurrentTime );
         vTaskSetxStartTime( xTaskOfHandle[xMyFlag], xCurrentTime );
 
         // init to zero
@@ -532,12 +542,19 @@ void vR_Servant( void * pvParameter)
         // not time yet, R-Servant should be sleep until next period of any task
         if( xResult == -1 )
         {
-            //vTaskDelayLET();
+            vTaskDelayLET();
+            xCurrentTime = xTaskGetTickCount();
+            vPrintNumber( xCurrentTime );
+            vPrintNumber( (xMyFlag + 10) * 3 );
             continue; 
         }
         else if ( xResult == 0 )
         {
-            //vTaskDelayLET();
+            vTaskDelayLET();
+            xCurrentTime = xTaskGetTickCount();
+            vPrintNumber( xCurrentTime );
+            vPrintNumber( (xMyFlag + 10) * 3 );
+            //vPrintString("not time yet\n\r");
             continue;
         }
         else
@@ -554,10 +571,10 @@ void vR_Servant( void * pvParameter)
                 }
             }
 
-            //vTaskDelayLET();
+            vTaskDelayLET();
             xCurrentTime = xTaskGetTickCount();
-            //vPrintNumber( xCurrentTime );
-            //vPrintNumber( (xMyFlag + 10) * 3 );
+            vPrintNumber( xCurrentTime );
+            vPrintNumber( (xMyFlag + 10) * 3 );
 
             // send semaphore to destinationtcb
             xSemaphoreGive( xBinarySemaphore[j] );

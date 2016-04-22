@@ -128,7 +128,7 @@ static void vListIntialiseEventItem( xEventHandle pvOwner, xListItem * pxNewEven
 
 static void vEventSetxData( xEventHandle pxEvent, struct eventData xData);
 
-static void vEventSetxTimeStamp( xEventHandle pxNewEvent, portTickType xTime );
+static void vEventSetxTimeStamp( xEventHandle pxNewEvent );
 
 static xList * pxGetReadyList( void );
 
@@ -148,15 +148,22 @@ static void prvInitialiseEventLists(void )
 
 static portBASE_TYPE xCompareFunction( const struct timeStamp t1, const struct timeStamp t2 )
 {
-    if( t1.xTime < t2.xTime )
+    if( t1.xSlackTime < t2.xSlackTime )
     {
         return pdTRUE;
     }
-    else if ( t1.xTime == t2.xTime)
+    else if( t1.xSlackTime == t2.xSlackTime )
     {
-        if( t1.xLevel < t2.xLevel )
+        if( t1.xTime < t2.xTime )
         {
             return pdTRUE;
+        }
+        else if( t1.xTime == t2.xTime )
+        {
+            if( t1.xLevel < t2.xLevel )
+            {
+                return pdTRUE;
+            }
         }
     }
 
@@ -191,14 +198,30 @@ struct eventData xEventGetxData( xEventHandle pxEvent)
     return ((eveECB *) pxEvent)->xData;
 }
 
-void vEventSetxTimeStamp( xEventHandle pxNewEvent, portTickType xTime )
+static void vEventSetxTimeStamp( xEventHandle pxNewEvent )
 {
     eveECB * pxEvent =(eveECB *) pxNewEvent;
-    /* get the current task TCB handler*/
-    xTaskHandle pxCurrentTCBLocal = xTaskGetCurrentTaskHandle();
+    portTickType xDestxLet = xTaskGetxLet(pxEvent->pxDestination);
+    portTickType xDeadline = pxEvent->xData.xNextPeriod;
+
+    /* set the xSlackTime of this event */
+    portTickType xCurrentTime = xTaskGetTickCount();
+    /* LST is too complicated to be implemented in embedded system where computing resources are precious */
+    //pxEvent->xTimeStamp.xSlackTime = xDeadline - ( xCurrentTime + xDestxLet );
+    /* EDF scheduling algorithm */
+    pxEvent->xTimeStamp.xSlackTime = xDeadline ;
+
 
     /*set the time of this event to be processed */
-    pxEvent->xTimeStamp.xTime = xTime ;
+    if( pxEvent->xData.IS_LAST_SERVANT == 1 )
+    {
+        pxEvent->xTimeStamp.xTime = xDeadline;
+    }
+    else
+    {
+        pxEvent->xTimeStamp.xTime = pxEvent->xData.xTime ;
+    }
+
 
     /*the microstep is not used now*/
     pxEvent->xTimeStamp.xMicroStep = 0;
@@ -304,6 +327,7 @@ static void prvEventListGenericInsert( xListItem *pxNewListItem )
         taskEXIT_CRITICAL();
     }
 
+    // insert the new event before a bigger one.
     pxNewListItem->pxNext = pxIterator->pxNext;
     pxNewListItem->pxNext->pxPrevious = ( volatile xListItem * ) pxNewListItem;
     pxNewListItem->pxPrevious = pxIterator;
@@ -342,6 +366,7 @@ void vEventGenericCreate( xTaskHandle pxDestination, struct eventData pdData)
         {
            // pxEndFlagEvent->pxSource = pxEndFlagEvent->pxDestination = NULL;
             // there may be some problem here because of this assignment way
+            pxEndFlagEvent->xTimeStamp.xSlackTime = portMAX_DELAY;
             pxEndFlagEvent->xTimeStamp.xTime = portMAX_DELAY;
             pxEndFlagEvent->xTimeStamp.xMicroStep = portMAX_DELAY;
             pxEndFlagEvent->xTimeStamp.xLevel = portMAX_DELAY;
@@ -362,18 +387,12 @@ void vEventGenericCreate( xTaskHandle pxDestination, struct eventData pdData)
         pxNewEvent->pxDestination = pxDestination;
 
         /* initialise the time stamp of an event item according to the sort algorithm.*/
-        if( pdData.IS_LAST_SERVANT == 1 )
-        {
-            vEventSetxTimeStamp( pxNewEvent, pdData.xNextPeriod);
-        }
-        else
-        {
-            vEventSetxTimeStamp( pxNewEvent, pdData.xTime );
-        }
+        vEventSetxData( pxNewEvent, pdData );
+
+        vEventSetxTimeStamp( pxNewEvent );
+        //vPrintString("event creating\n\r");
 
         vListIntialiseEventItem( pxNewEvent, (xListItem *) &pxNewEvent->xEventListItem );
-
-        vEventSetxData( pxNewEvent, pdData );
 
         /*how to call this funciton: vEventListInsert( newListItem ). This function add the new item into the xEventList as default*/
         prvEventListGenericInsert( (xListItem *) &(pxNewEvent->xEventListItem));
@@ -397,8 +416,9 @@ portBASE_TYPE xEventListGenericTransit( xListItem ** pxEventListItem, xList ** p
         return -1;
     }
         
-    // get the first event of the xEventList.  
+    // get the first event item in the xEventList.  
     *pxEventListItem = (xListItem *)xEventList.xListEnd.pxNext;
+    // every cpu has a event ready list. the transit function is called only when cpu turn into idle state.
     *pxCurrentReadyList = pxGetReadyList();
 
     struct timeStamp xTimeStamp = xEventGetxTimeStamp((xEventHandle) (*pxEventListItem)->pvOwner);
