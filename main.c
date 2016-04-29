@@ -141,7 +141,7 @@ inline unsigned long myTraceGetTimeMillisecond(){
 void vApplicationTickHook( void )
 {
     portTickType xCurrentTime = xTaskGetTickCount();
-    if( IS_INIT == 1 && xCurrentTime == 70 )
+    if( IS_INIT[0] == 0 && xCurrentTime == 70 )
     {
         xSemaphoreGive( xBinarySemaphore[0] );
         xSemaphoreGive( xBinarySemaphore[2] );
@@ -156,7 +156,7 @@ void vApplicationTickHook( void )
         xSemaphoreGive( xBinarySemaphore[18] );
         xSemaphoreGive( xBinarySemaphore[19] );
         xSemaphoreGive( xBinarySemaphore[20] );
-        IS_INIT = 0;
+        IS_INIT[0] = 0;
     }
     
     // send semaphore to R-Servant to triggered it to cope with events 
