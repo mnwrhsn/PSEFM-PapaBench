@@ -1,0 +1,27 @@
+set title "Response Time of Tasks"
+
+set grid
+set key box
+set autoscale fix
+set ytics 0,1
+set xtics 100
+set yrange [-1:14]
+
+
+set multiplot layout 2,1
+
+set ylabel "Task ID"
+set xlabel "Time(ms)"
+set xrange [4000:5999]
+
+plot 'formate_order.data1' using 1:3:1:2 with xerrorbars title "Response Time", '' using 1:3 w p pt 7 ps 1 title "Ready Time", '' using 2:3 w p pt 4 ps 1 title "Finish Time"
+
+set ylabel "Task ID"
+set xlabel "Time(ms)"
+set xrange [6000:8000]
+
+plot 'formate_order.data2' using 1:3:1:2 with xerrorbars title "Response Time", '' using 1:3 w p pt 7 ps 1 title "Ready Time", '' using 2:3 w p pt 4 ps 1 title "Finish Time"
+
+
+unset multiplot
+

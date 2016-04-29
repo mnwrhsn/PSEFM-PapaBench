@@ -20,7 +20,7 @@
 #include "servant.h"
 #include "app.h"
 
-static portBASE_TYPE IS_INIT = 1;
+static portBASE_TYPE IS_INIT[NUMBEROFTASK];
 static void setup_hardware( void );
 
 extern struct xParam pvParameters[NUMBEROFSERVANT];
@@ -33,17 +33,14 @@ extern portTickType xPeriodOfTask[NUMBEROFTASK];
 extern xTaskComplete[NUMBEROFTASK];
 
 
-/*
-struct xParam
+void vInitInitialise()
 {
-    portBASE_TYPE xMyFlag;     // the flag of current servant
-    portBASE_TYPE xNumOfIn;    // the number of source servants
-    portBASE_TYPE xNumOfOut;   // the number of destination servants
-    portBASE_TYPE xInFlag[MAXINDEGREE];  // the flags of source servants
-    portBASE_TYPE xOutFlag[MAXOUTDEGREE]; // the flags of destination servants
-    portTickType xLet; // the xLet of current servant
-    pvServantFunType xFp;  // the implementation of current Servant
-}; */
+    portBASE_TYPE i;
+    for(i = 0; i < NUMBEROFTASK; ++ i)
+    {
+        IS_INIT[i] = 0;
+    }
+}
 
 #define SERVANT_STACK_SIZE 128 
 int main(void)
@@ -54,6 +51,7 @@ int main(void)
     enable_rs232();
 
     //vTaskCompleteInitialise();
+    vInitInitialise();
     vSemaphoreInitialise();
     vParameterInitialise();
 
@@ -143,7 +141,7 @@ inline unsigned long myTraceGetTimeMillisecond(){
 void vApplicationTickHook( void )
 {
     portTickType xCurrentTime = xTaskGetTickCount();
-    if( IS_INIT == 1 && xCurrentTime == 100 )
+    if( IS_INIT == 1 && xCurrentTime == 70 )
     {
         xSemaphoreGive( xBinarySemaphore[0] );
         xSemaphoreGive( xBinarySemaphore[2] );

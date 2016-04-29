@@ -1,0 +1,18 @@
+1. datafile.data is the origin data file from freeRTOS+papabench
+    The data in datafile.data includes: 
+        task id1, qemu time
+        start time, qemu time
+        end time, qemu time
+        task id2, qemu time
+    and id2 = (id1 + 10)*3
+
+2. datafile.data ->  datafile.sh > datafile.out+datafile.ave 
+    1) datafile.out contains the execution time and order of every task
+    2) datafile.ave contains the inforamtion about execution time of every task
+
+3. datafile.out -> order.sh > formate_order.data1+formate_order.data2
+    1) formate_order.data1 contains the execution order of tasks from counts 0-200
+    2) formate_order.data2 contains the execution order of tasks from counts 200-400
+
+4. one.*
+    choose one servant and analyze the distribution of its execution time

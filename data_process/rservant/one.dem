@@ -1,0 +1,7 @@
+set title "R-servant Execution Time"
+
+set key box
+set autoscale
+set ytics 0,0.01
+
+plot 'one.out' using 1:2 w p pt 7 t "execution time"
