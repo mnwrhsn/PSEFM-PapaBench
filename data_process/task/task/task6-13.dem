@@ -1,0 +1,23 @@
+set grid
+#set key box
+set autoscale fix
+
+set xlabel "Cycles"
+set ylabel "Time(ms)"
+
+set multiplot layout 5,1
+
+plot 'task6.out' using 1:2 w p pt 1 ps 1 title "task 6"
+plot 'task7.out' using 1:2 w p pt 1 ps 1 title "task 7"
+plot 'task8.out' using 1:2 w p pt 1 ps 1 title "task 8"
+#plot 'task9.out' using 1:2 w p pt 1 ps 1 title "response time"
+#plot 'task10.out' using 1:2 w p pt 1 ps 1 title "response time"
+plot 'task11.out' using 1:2 w p pt 1 ps 1 title "task 11"
+plot 'task12.out' using 1:2 w p pt 1 ps 1 title "task 12"
+plot 'task13.out' using 1:2 w p pt 1 ps 1 title "task 13"
+
+
+
+unset multiplot
+
+

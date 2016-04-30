@@ -1,0 +1,6 @@
+set title "Servant Zero Execution Time"
+
+set key box
+set autoscale
+
+plot 'one.out' using 1:2 w p pt 7 t "execution time"

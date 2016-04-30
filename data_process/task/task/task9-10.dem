@@ -1,0 +1,17 @@
+set grid
+#set key box
+set autoscale fix
+
+set xlabel "Cycles"
+set ylabel "Time(ms)"
+
+set multiplot layout 2,1
+
+plot 'task9.out' using 1:2 w p pt 1 ps 1 title "task 9"
+plot 'task10.out' using 1:2 w p pt 1 ps 1 title "task 10"
+
+
+
+unset multiplot
+
+

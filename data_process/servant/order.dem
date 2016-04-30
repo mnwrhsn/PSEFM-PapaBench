@@ -1,0 +1,20 @@
+set title "PapaBench in FreeRTOS Execution Order under nonpreempted Environment"
+
+set grid
+set key box
+set autoscale fix
+set ytics 0,1
+
+set multiplot layout 2,1
+
+set ylabel "Task ID"
+set xlabel "Counts"
+
+plot 'formate_order.data1' using 1:2 w lp pt 7 t "Order"
+
+set ylabel "Task ID"
+set xlabel "Counts"
+
+plot 'formate_order.data2' using 1:2 w lp pt 7 t "Order"
+
+unset multiplot

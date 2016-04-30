@@ -71,7 +71,7 @@
 #include "eventlist.h"
 
 
-#define NUMBEROFSERVANT 22 
+#define NUMBEROFSERVANT 35 
 #define NUMBEROFTASK 13
 #define MAXRELATION NUMBEROFSERVANT 
 
