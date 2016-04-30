@@ -390,7 +390,6 @@ void vEventGenericCreate( xTaskHandle pxDestination, struct eventData pdData)
         vEventSetxData( pxNewEvent, pdData );
 
         vEventSetxTimeStamp( pxNewEvent );
-        //vPrintString("event creating\n\r");
 
         vListIntialiseEventItem( pxNewEvent, (xListItem *) &pxNewEvent->xEventListItem );
 
