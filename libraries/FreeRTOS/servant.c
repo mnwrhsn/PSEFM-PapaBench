@@ -78,8 +78,8 @@
 #include "servant.h"
 #include "app.h"
 #define xFunctionTimes 500
-//#define SENSOR_PRINT
-//#define SERVANT_PRINT
+#define SENSOR_PRINT
+#define SERVANT_PRINT
 //#define RSERVANT_PRINT
 //#define SENSOR_LET
 //#define SERVANT_LET
@@ -87,6 +87,7 @@
 //#define SENSOR_FUN
 //#define SERVANT_FUN
 
+static portBASE_TYPE xFutureModelTime;
 xList * pxCurrentReadyList;         // record the xEventReadyList that R-Servant transit event just now
 struct xParam pvParameters[NUMBEROFSERVANT];
 
@@ -321,8 +322,10 @@ void vSensor( void * pvParameter )
         for( i = 0; i < NUM; i ++ )
         {
             xDatas[i].xNextPeriod = deadline;
-            xDatas[i].xTime = xCurrentTime + xLet;
+            xDatas[i].xTime = deadline - xPeriod + xLet;
         }
+        // set the future model time
+        xFutureModelTime = deadline - xPeriod + xLet;
 
         // create events for all destination servants of this servant. 
         vEventCreateAll( pvMyParameter, xDatas );
@@ -396,7 +399,8 @@ void vServant( void * pvParameter )
         for( i = 0; i < xNumOfOut; i ++ )
         {
             xDatas[i] = xEventGetxData(pxEvent[i]);
-            xDatas[i].xTime = xCurrentTime + xLet;
+            xDatas[i].xTime = xFutureModelTime + xLet;
+            xFutureModelTime = xDatas[i].xTime;
         }
 
 #ifdef SERVANT_PRINT
