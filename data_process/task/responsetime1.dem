@@ -1,0 +1,22 @@
+set title "Execution Time of Servant"
+
+set grid
+set key box
+set autoscale fix
+set ytics 0,1
+set xtics 100
+set yrange [-1:34]
+set ylabel "Servant ID"
+set xrange [6000:6999]
+
+plot 'formate_order.data3' using 3:2:4:5 with xerrorbars title "Execution Time"
+#'' using 3:2 w p pt 7 ps 1 title "Ready Time"
+
+set ylabel "Servant ID"
+set xrange [7000:7999]
+
+plot 'formate_order.data4' using 3:2:4:5 with xerrorbars title "Execution Time"
+#'' using 3:2 w p pt 7 ps 1 title "Ready Time"
+
+unset multiplot
+

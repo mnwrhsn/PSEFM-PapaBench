@@ -256,13 +256,8 @@ struct eventData xEventGetxData( xEventHandle pxEvent)
 static void vEventSetxTimeStamp( xEventHandle pxNewEvent )
 {
     eveECB * pxEvent =(eveECB *) pxNewEvent;
-    portTickType xDestxLet = xTaskGetxLet(pxEvent->pxDestination);
     portTickType xDeadline = pxEvent->xData.xNextPeriod;
 
-    /* set the xDeadline of this event */
-    portTickType xCurrentTime = xTaskGetTickCount();
-    /* LST is too complicated to be implemented in embedded system where computing resources are precious */
-    //pxEvent->xTimeStamp.xDeadline = xDeadline - ( xCurrentTime + xDestxLet );
     /* EDF scheduling algorithm */
     pxEvent->xTimeStamp.xDeadline= xDeadline ;
 
@@ -467,7 +462,7 @@ portBASE_TYPE xEventListGenericTransit( xListItem ** pxEventListItem, xList ** p
 
     }
 
-    // if no executable event, then return NULL and information about not time yet
+    // if no executable event exists, then return NULL and information about not time yet
     if( listCURRENT_LIST_LENGTH(& xEventExecutableList) == 1 )
     {
         *pxCurrentReadyList = NULL;

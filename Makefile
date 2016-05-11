@@ -114,10 +114,11 @@ if_calib.o : $(PAPA_VAR_INC)/inflight_calib.h
 
 qemu: main.bin $(QEMU_STM32)
 	$(QEMU_STM32) -monitor stdio -M stm32-p103 -nographic -kernel main.bin -serial pty
-#	$(QEMU_STM32) -M stm32-p103 -kernel main.bin
+#	$(QEMU_STM32) -M stm32-p103 -kernel ~/ucos_stm32.bin
 
 qemugdb: main.bin $(QEMU_STM32)
-	$(QEMU_STM32) -M stm32-p103 -gdb tcp::3333 -S -nographic -kernel main.bin -serial pty
+	#$(QEMU_STM32) -M stm32-p103 -gdb tcp::3333 -S -nographic -kernel main.bin -serial pty
+	$(QEMU_STM32) -M stm32-p103 -gdb tcp::3333 -S -kernel  ~/ucos_stm32.bin 
 
 qemuauto: main.bin
 	bash emulate.sh main.bin

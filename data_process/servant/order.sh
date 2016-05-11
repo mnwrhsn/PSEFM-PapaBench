@@ -1,4 +1,4 @@
 #!/bin/bash
 
-awk 'NR<=200{print NR, $2}' datafile.out > formate_order.data1
-awk 'NR>200 && NR<=400{print NR, $2}' datafile.out > formate_order.data2
+awk '$3>=4000 && $3<=6000 {print NR, $1, $2, $3, $4, $5}' datafile.out > formate_order.data1
+awk '$3>=6000 && $3<=8000 {print NR, $1, $2, $3, $4, $5}' datafile.out > formate_order.data2

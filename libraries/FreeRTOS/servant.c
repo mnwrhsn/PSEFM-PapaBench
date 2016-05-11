@@ -78,11 +78,11 @@
 #include "servant.h"
 #include "app.h"
 #define xFunctionTimes 500
-#define SENSOR_PRINT
-#define SERVANT_PRINT
+//#define SENSOR_PRINT
+//#define SERVANT_PRINT
 //#define RSERVANT_PRINT
 //#define SENSOR_LET
-#define SERVANT_LET
+//#define SERVANT_LET
 //#define RSERVANT_LET
 //#define SENSOR_FUN
 //#define SERVANT_FUN
@@ -108,26 +108,6 @@ extern portBASE_TYPE xTaskOfServant[NUMBEROFSERVANT];
 
 // record the period of Task
 extern portTickType xPeriodOfTask[NUMBEROFTASK];
-
-/* These flags are used to judge whether the task completes execution. 
- * if not, then it will not be triggered again even the current time 
- * is the start time of the period of the task, which will be a bug 
- * when other servant's execution time less than 1ms. 
- * And now, this bug will be fixed by add this flags of every task.
- */
-//extern portBASE_TYPE xTaskComplete[NUMBEROFTASK];
-
-/*
-void vTaskCompleteInitialise()
-{
-    portBASE_TYPE i;
-
-    for( i = 0; i < NUMBEROFTASK; ++ i )
-    {
-        xTaskComplete[i] = 1;
-    }
-}
-*/
 
 /* create all semaphores which are used to triggered s-servant */
 void vSemaphoreInitialise()
@@ -265,10 +245,9 @@ void vEventCreateAll( void * pvParameter, struct eventData *xDatas )
 void vSensor( void * pvParameter )
 {
     portTickType xCurrentTime;
-    portTickType deadline;
+
     portBASE_TYPE i;
     portBASE_TYPE IS_FIRST_TIME_TO_EXE = 1;
-    portBASE_TYPE xCount = 1;
 
     /* store the paramter into stack of servant */
     void * pvMyParameter = pvParameter;
@@ -279,6 +258,9 @@ void vSensor( void * pvParameter )
     portTickType xPeriod = ((struct xParam *) pvMyParameter)->xPeriod;
     pvServantFunType xMyFun = ((struct xParam *) pvMyParameter)->xFp;
 
+    portBASE_TYPE xCount = 1;
+    portTickType deadline = xCount * xPeriod;
+
     /* set the LET of Servant when it is created */
     vTaskSetxLet(xTaskOfHandle[xMyFlag], xLet);
     
@@ -287,7 +269,6 @@ void vSensor( void * pvParameter )
     
     /* create data for destination servants and initialise them */
     struct eventData xDatas[NUM];
-
 
     while(1)
     {
@@ -298,14 +279,13 @@ void vSensor( void * pvParameter )
             xSemaphoreTake(xBinarySemaphore[xMyFlag], portMAX_DELAY);
 #ifdef SENSOR_PRINT
             vPrintNumber( xMyFlag );
+            vPrintNumber( deadline ); // ready time  of task 
 #endif 
-
             xCurrentTime = xTaskGetTickCount();
-            vTaskSetxStartTime( xTaskOfHandle[xMyFlag], xCurrentTime );
-
 #ifdef SENSOR_PRINT
-            vPrintNumber( xCurrentTime );
+            vPrintNumber( xCurrentTime ); // start time of task
 #endif
+            vTaskSetxStartTime( xTaskOfHandle[xMyFlag], xCurrentTime );
 
             IS_FIRST_TIME_TO_EXE = 0;
         }
@@ -319,23 +299,22 @@ void vSensor( void * pvParameter )
 
 #ifdef SENSOR_PRINT
             vPrintNumber( xMyFlag );
+            vPrintNumber( deadline ); // ready time of task 
 #endif 
-
             xCurrentTime = xTaskGetTickCount();
+#ifdef SENSOR_PRINT
+            vPrintNumber( xCurrentTime ); // start time of task 
+#endif
             vTaskSetxStartTime( xTaskOfHandle[xMyFlag], xCurrentTime );
 
-#ifdef SENSOR_PRINT
-            vPrintNumber( xCurrentTime );
-#endif
-
-            // deal with the output things and seeing whether current task misses deadline
+            // do actuator and sensor
 #ifdef SENSOR_FUN
             xMyFun( NULL, 0, xDatas, NUM);
 #endif
             vEventDeleteAll(pvMyParameter, pxEvent);
         }
 
-        // xStartTime is the start time of next period which is also the deadline of current period
+        // deadline is the start time of next period
         xCount ++;
         deadline = xCount * xPeriod; 
 
@@ -359,8 +338,10 @@ void vSensor( void * pvParameter )
         }
 
 #ifdef SENSOR_PRINT
+
         xCurrentTime = xTaskGetTickCount();
-        vPrintNumber( xCurrentTime );
+        vPrintNumber( xCurrentTime );  // finish time of sensor
+        vPrintNumber( deadline );   // deadline of task
         vPrintNumber( ( xMyFlag + 10 ) * 3 );
 #endif
 
@@ -408,19 +389,20 @@ void vServant( void * pvParameter )
 #ifdef SERVANT_PRINT
         vPrintNumber(xMyFlag);
 #endif
-
         xCurrentTime = xTaskGetTickCountFromISR();
         vTaskSetxStartTime( xTaskOfHandle[xMyFlag], xCurrentTime );
 
-#ifdef SERVANT_PRINT
-        vPrintNumber( xCurrentTime );
-#endif
         /* Here are coding for processing data of events */
         for( i = 0; i < xNumOfOut; i ++ )
         {
             xDatas[i] = xEventGetxData(pxEvent[i]);
             xDatas[i].xTime = xCurrentTime + xLet;
         }
+
+#ifdef SERVANT_PRINT
+        vPrintNumber( xDatas[0].xNextPeriod - xPeriod ); // ready time of task
+        vPrintNumber( xCurrentTime );   // start time of current servant
+#endif
 
 #ifdef SERVANT_FUN
         for( i = 0; i < xFunctionTimes; ++ i )
@@ -442,12 +424,10 @@ void vServant( void * pvParameter )
         vTaskDelayLET();
 #endif
 
-        //vPrintNumber( xCurrentTime );
-        //vPrintNumber( xDatas[0].xNextPeriod - xPeriod ); // output the ready time of task
-        //vPrintNumber( xDatas[0].xNextPeriod );  // output the deadline of task
 #ifdef SERVANT_PRINT
         xCurrentTime = xTaskGetTickCount();
-        vPrintNumber( xCurrentTime );
+        vPrintNumber( xCurrentTime );   // finish time of current servant
+        vPrintNumber( xDatas[0].xNextPeriod ); // deadline of task
         vPrintNumber( (xMyFlag + 10) * 3 );
 #endif
 
