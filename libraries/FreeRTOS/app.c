@@ -131,39 +131,39 @@ portBASE_TYPE xSensorOfTask[NUMBEROFTASK] =
 // the LET of all S-Servant (ms)
 portTickType xLetOfServant[NUMBEROFSERVANT] = 
 { 
-    1,  // task 0
+    4,  // task 0
     13,   //
     2,    //
-    1,      // task 1
+    4,      // task 1
     4,    //
     3,    //
-    1,      // task 2
+    4,      // task 2
     3,    //
-    1,      // task 3
+    4,      // task 3
     6,    //
-    1,      // task 4
+    4,      // task 4
     7,    //
-    1,      // task 5
+    4,      // task 5
     7,    //
     5,    //
-    1,      // task 6
+    4,      // task 6
     3,    //
     4,    //
     6,    //
-    1,      // task 7
+    4,      // task 7
     2,    //
-    1,      // task 8
+    4,      // task 8
     2,    //
     4,    //
-    1,      // task 9
+    4,      // task 9
     3,    //
     5,    //
     4,    //
-    1,      // task 10
+    4,      // task 10
     3,    //
-    1,      // task 11
+    4,      // task 11
     6,    //
-    1,      // task 12
+    4,      // task 12
     6,    //
     1     //   R-servant   
 };

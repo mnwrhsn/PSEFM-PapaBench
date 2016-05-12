@@ -96,7 +96,7 @@ typedef struct eveEventControlBlock
 
 
 /* Event lists must be initialised before the first time to create an event. */
-
+PRIVILEGED_DATA static xList xEventPool;  /*< Event Pool which store the events from S-Servant in terms of FIFO>*/
 PRIVILEGED_DATA static  xList xEventList;                            /*< Event List is used to store the event item in a specific order which sended or received by S-Servant.>*/
 PRIVILEGED_DATA static xList xEventExecutableList;   /*< store the executable event which satisfies the time requirement >*/
 PRIVILEGED_DATA static xList xEventReadyList[configCPU_NUMBER];                       /*< Event list is used to store the ready to be received events. the configCPU_NUMBER is defined in freeRTOSConfig.h>*/
@@ -143,6 +143,7 @@ static void prvInitialiseEventLists(void )
 {
     volatile portBASE_TYPE xCPU;
 
+    vListInitialise( ( xList * ) &xEventPool );
     vListInitialise( ( xList * ) &xEventList );
     vListInitialise( ( xList * ) &xEventExecutableList );
 
@@ -410,9 +411,8 @@ void vEventGenericCreate( xTaskHandle pxDestination, struct eventData pdData)
 
         vListIntialiseEventItem( pxNewEvent, (xListItem *) &pxNewEvent->xEventListItem );
 
-        /*how to call this funciton: vEventListInsert( newListItem ). This function add the new item into the xEventList as default*/
-        prvEventListGenericInsert1( (xListItem *) &(pxNewEvent->xEventListItem));
-    
+        // insert the event into eventpool with O(1)
+        vListInsertEnd(&xEventPool, (xListItem *)& pxNewEvent->xEventListItem);
     }
     taskEXIT_CRITICAL();
 
@@ -424,9 +424,17 @@ void vEventGenericCreate( xTaskHandle pxDestination, struct eventData pdData)
 * transfer the executable to specific xEventReadyList according to the condition of CPU*/
 portBASE_TYPE xEventListGenericTransit( xListItem ** pxEventListItem, xList ** pxCurrentReadyList)
 {
-    //if( listLIST_IS_EMPTY(&xEventList) )
-    // if there is only End Flag Event in xEventList, then return NULL.
+    xListItem * temp_pxEventListItem;
+    // transmit events from event pool to xEventList according to the xCompareFunction1
+    while(listCURRENT_LIST_LENGTH( &xEventPool ) != 0)
+    {
+        temp_pxEventListItem = (xListItem *) xEventPool.xListEnd.pxNext;    
+        vListRemove(temp_pxEventListItem);
+        /*how to call this funciton: vEventListInsert( newListItem ). This function add the new item into the xEventList as default*/
+        prvEventListGenericInsert1( temp_pxEventListItem ); 
+    }
 
+    // if there is only End Flag Event in xEventList, then return NULL.
     if( listCURRENT_LIST_LENGTH(&xEventList) == 1 )
     {
         *pxEventListItem  = NULL;
@@ -434,7 +442,6 @@ portBASE_TYPE xEventListGenericTransit( xListItem ** pxEventListItem, xList ** p
         return -1;
     }
         
-    xListItem * temp_pxEventListItem;
     struct timeStamp xTimeStamp;
     portTickType xCurrentTime;
     // transmit the executable event from xEventList to xEventExecutableList 
