@@ -36,6 +36,7 @@ all: main.bin
 #autopilot: 
 #	cd $(PAPA_AUTO_SRC); make $(PAPABENCH_FLAGS) all
 
+
 main.bin: main.c
 	$(CROSS_COMPILE)gcc \
 		-Wl,-Tmain.ld -nostartfiles \

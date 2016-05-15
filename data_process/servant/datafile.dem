@@ -1,4 +1,4 @@
-set title "Execution Information Tasks of PapaBench in FreeRTOS"
+set title "Execution Information Of Servant in PSEFM" 
 set style data histogram
 set style histogram clustered gap 1
 set style fill solid 0.6 noborder
@@ -6,14 +6,13 @@ set style fill solid 0.6 noborder
 set key box
 set autoscale
 set grid
-set yrange [-1:14]
 
 set xtics 0,1
-set ytics 0,0.5
-set xlabel "Task ID"
+#set ytics 0,1
+set xlabel "Servant ID"
 set ylabel "Time (ms)"
 
-plot 'datafile.ave' using 3:xticlabels(1) title columnheader(3), '' using 4:xticlabels(1) title columnheader(4), '' using 5:xticlabels(1) title columnheader(5) 
+plot 'servant.ave' using 3:xticlabels(1) title columnheader(3), '' using 4:xticlabels(1) title columnheader(4), '' using 5:xticlabels(1) title columnheader(5) 
 
 
 

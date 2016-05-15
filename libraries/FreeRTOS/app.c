@@ -95,19 +95,19 @@ xTaskHandle xTaskOfHandle[NUMBEROFSERVANT];         // record the handle of all 
 //portBASE_TYPE xTaskComplete[NUMBEROFTASK];  // record whether specified task completes execution
 portTickType xPeriodOfTask[NUMBEROFTASK] =
 {
-    100,
-    100,
-    200,
-    200,
-    200,
-    100,
-    200,
-    200,
-    1000,
-    1000,
-    1000,
-    1000,
-    400
+    250 ,
+    250 ,
+    500 ,
+    500 ,
+    500 ,
+    250 ,
+    500 ,
+    500 ,
+    2500,
+    2500,
+    2500,
+    2500,
+    1000  
 };
 
 portBASE_TYPE xSensorOfTask[NUMBEROFTASK] =
@@ -128,47 +128,88 @@ portBASE_TYPE xSensorOfTask[NUMBEROFTASK] =
 };
 
 
-// the LET of all S-Servant (ms)
+/*
+// the LET of all S-Servant (100us) 100
 portTickType xLetOfServant[NUMBEROFSERVANT] = 
 { 
-    4,  // task 0
-    13,   //
+    2 ,  // task 0
+    11,   //
     2,    //
-    4,      // task 1
+    2,      // task 1
     4,    //
     3,    //
-    4,      // task 2
-    3,    //
-    4,      // task 3
+    2,      // task 2
+    2,    //
+    2,      // task 3
+    8,    //
+    2,      // task 4
+    8,    //
+    2,      // task 5
+    9,    //
     6,    //
-    4,      // task 4
-    7,    //
-    4,      // task 5
-    7,    //
+    2,      // task 6
+    2,    //
+    3,    //
+    8,    //
+    2,      // task 7
+    2,    //
+    2,      // task 8
+    3,    //
+    3,    //
+    2,      // task 9
+    4,    //
+    4,    //
     5,    //
-    4,      // task 6
-    3,    //
+    2,      // task 10
     4,    //
-    6,    //
-    4,      // task 7
-    2,    //
-    4,      // task 8
-    2,    //
-    4,    //
-    4,      // task 9
-    3,    //
+    2,      // task 11
+    9,    //
+    2,      // task 12
     5,    //
-    4,    //
-    4,      // task 10
-    3,    //
-    4,      // task 11
-    6,    //
-    4,      // task 12
-    6,    //
     1     //   R-servant   
 };
+*/
+// the LET of all S-Servant (100us) 100
+portTickType xLetOfServant[NUMBEROFSERVANT] = 
+{ 
+    1, 
+    24,
+    2,
+    1,
+    8,
+    4,
+    1,
+    3,
+    1,
+    15, 
+    1,
+    15,
+    1,
+    17,
+    12,
+    1,
+    3,
+    5,
+    17,
+    1,
+    3,
+    1,
+    3,
+    5,
+    1,
+    6,
+    8,
+    8,
+    1,
+    9,
+    1,
+    20,
+    1,
+    10,
+    1 
+};
 
-// mark the task id of every s-servant
+// mark the task id of every s-servant 100
 portBASE_TYPE xTaskOfServant[NUMBEROFSERVANT] =
 {
     0, 
@@ -207,6 +248,7 @@ portBASE_TYPE xTaskOfServant[NUMBEROFSERVANT] =
     12, 
     0  // r-servant
 };
+
 
 // record the relationship among servants excluding R-Servant
 /*
@@ -496,3 +538,6 @@ pvServantFunType xServantTable[NUMBEROFSERVANT] =
     &s_33,
     NULL
 };
+
+
+
