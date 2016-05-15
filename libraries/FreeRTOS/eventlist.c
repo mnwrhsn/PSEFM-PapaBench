@@ -430,6 +430,26 @@ void vEventGenericCreate( xTaskHandle pxDestination, struct eventData pdData)
     taskEXIT_CRITICAL();
 }
 
+portBASE_TYPE Is_Executable_Event_Arrive()
+{
+    xListItem * temp_pxEventListItem;
+    portTickType xCurrentTime;
+    struct timeStamp xTimeStamp;
+    
+    if(listCURRENT_LIST_LENGTH(&xEventList) > 1)
+    {
+        temp_pxEventListItem = (xListItem *)xEventList.xListEnd.pxNext;
+        xTimeStamp = xEventGetxTimeStamp( (xEventHandle) (temp_pxEventListItem)->pvOwner );
+        xCurrentTime = xTaskGetTickCount();
+
+        // the event is executable
+        if( xTimeStamp.xTime <= xCurrentTime )
+        {
+            return 1;
+        }
+    }
+    return 0;
+}
 
 /* An API to transfer all executable Event Items from xEventList to xEventExecutableList.
 * Then, choose the first executable event item in xEventExecutableList to proceed, which means
@@ -437,25 +457,18 @@ void vEventGenericCreate( xTaskHandle pxDestination, struct eventData pdData)
 portBASE_TYPE xEventListGenericTransit( xListItem ** pxEventListItem, xList ** pxCurrentReadyList)
 {
     xListItem * temp_pxEventListItem;
+    struct timeStamp xTimeStamp;
+    portTickType xCurrentTime;
+
     // transmit events from event pool to xEventList according to the xCompareFunction1
     while(listCURRENT_LIST_LENGTH( &xEventPool ) != 0)
     {
         temp_pxEventListItem = (xListItem *) xEventPool.xListEnd.pxNext;    
         vListRemove(temp_pxEventListItem);
-        /*how to call this funciton: vEventListInsert( newListItem ). This function add the new item into the xEventList as default*/
+        //how to call this funciton: vEventListInsert( newListItem ). This function add the new item into the xEventList as default
         prvEventListGenericInsert1( temp_pxEventListItem ); 
     }
 
-    // if there is only End Flag Event in xEventList, then return NULL.
-    if( listCURRENT_LIST_LENGTH(&xEventList) == 1 )
-    {
-        *pxEventListItem  = NULL;
-        *pxCurrentReadyList = NULL;
-        return -1;
-    }
-        
-    struct timeStamp xTimeStamp;
-    portTickType xCurrentTime;
     // transmit the executable event from xEventList to xEventExecutableList 
     while( listCURRENT_LIST_LENGTH( &xEventList ) > 1 )
     {
@@ -478,7 +491,6 @@ portBASE_TYPE xEventListGenericTransit( xListItem ** pxEventListItem, xList ** p
           // no executable event in xEventList
            break; 
         }
-
     }
 
     // if no executable event exists, then return NULL and information about not time yet

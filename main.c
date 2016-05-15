@@ -136,14 +136,8 @@ void vApplicationTickHook( void )
     // R-Servant will be suspend when no events need to be proceeded.
     // As a result, we need to send semaphore to R-Servant to triggered it processing events 
     // when time meeting the start time of every task period
-    if( xCurrentTime >= xPeriodOfTask[0] * 2 )
+    if(Is_Executable_Event_Arrive())
     {
-        if( xCurrentTime % xPeriodOfTask[0] == 0 || 
-            xCurrentTime % xPeriodOfTask[2] == 0 ||
-            xCurrentTime % xPeriodOfTask[8] == 0 ||
-            xCurrentTime % xPeriodOfTask[12] == 0)
-        {
-           xSemaphoreGive( xBinarySemaphore[NUMBEROFSERVANT - 1] ); 
-        }
+       xSemaphoreGive( xBinarySemaphore[NUMBEROFSERVANT - 1] ); 
     }
 }

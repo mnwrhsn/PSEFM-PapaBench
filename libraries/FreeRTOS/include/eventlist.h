@@ -108,6 +108,8 @@ typedef void * xEventHandle;
 
 void vInitialiseEventLists(portBASE_TYPE NumOfEvents);
 
+portBASE_TYPE Is_Executable_Event_Arrive();
+
 xTaskHandle xEventGetpxSource( xEventHandle pxEvent );
 
 xTaskHandle xEventGetpxDestination( xEventHandle pxEvent );

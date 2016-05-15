@@ -493,16 +493,10 @@ void vR_Servant( void * pvParameter)
              *
              * */
             xResult = xEventListTransit( &pxEventListItem, &pxCurrentReadyList);
-            if( xResult == -1 )
-            {
-                // no event
-                break;
-            }
-            else if( xResult == 0 )
+            if( xResult == 0 )
             {
                 // not time yet
-                //break;
-                continue;
+                break;
             }
             else
             {
@@ -548,7 +542,7 @@ void vR_Servant( void * pvParameter)
         } //  end inner while(1)
 
         // not time yet, R-Servant should be sleep until next period of any task
-        if( xResult == -1 )
+        if ( xResult == 0 )
         {
 #ifdef RSERVANT_LET
             vTaskDelayLET();
@@ -558,21 +552,8 @@ void vR_Servant( void * pvParameter)
             vPrintNumber( xCurrentTime );
             vPrintNumber( (xMyFlag + 10) * 3 );
 #endif
-            continue; 
         }
-        else if ( xResult == 0 )
-        {
-#ifdef RSERVANT_LET
-            vTaskDelayLET();
-#endif
-#ifdef RSERVANT_PRINT
-            xCurrentTime = xTaskGetTickCount();
-            vPrintNumber( xCurrentTime );
-            vPrintNumber( (xMyFlag + 10) * 3 );
-#endif
-            continue;
-        }
-        else
+        else  // triggered specified servant to execute
         {
             // set all the relations whose destination S-Servant is xTaskOfHandle[i] to 1.
             for( i = 0; i < xRelations.xNumOfRelation; ++ i )
