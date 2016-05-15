@@ -55,6 +55,7 @@ int main(void)
     vInitInitialise();
     vSemaphoreInitialise();
     vParameterInitialise();
+    vInitialiseEventLists(NUMBEROFEVENTS);  // parameter from app.h 
     portBASE_TYPE i,j;
     portBASE_TYPE flag = 0;
 
