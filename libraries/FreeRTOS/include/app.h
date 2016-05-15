@@ -73,6 +73,7 @@
 
 #define NUMBEROFSERVANT 35 
 #define NUMBEROFTASK 13
+#define NUMBEROFEVENTS 13  // NUMBEROFEVENTS = Sum( Max{Concurrents of Task i} )
 #define MAXRELATION NUMBEROFSERVANT 
 
 #define MAXOUTDEGREE 2   // network max in degree of every S-servant
@@ -101,7 +102,7 @@ void s_4(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData
 void s_5(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
 void s_6(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
 void s_7(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_8(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
+void s_8(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;  
 void s_9(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
 void s_10(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
 void s_11(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;

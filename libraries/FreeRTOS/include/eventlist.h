@@ -106,6 +106,8 @@ struct eventData
 
 typedef void * xEventHandle;
 
+void vInitialiseEventLists(portBASE_TYPE NumOfEvents);
+
 xTaskHandle xEventGetpxSource( xEventHandle pxEvent );
 
 xTaskHandle xEventGetpxDestination( xEventHandle pxEvent );

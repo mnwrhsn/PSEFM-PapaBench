@@ -96,6 +96,7 @@ typedef struct eveEventControlBlock
 
 
 /* Event lists must be initialised before the first time to create an event. */
+PRIVILEGED_DATA static xList xEventIdleList;  /*< Idel events are created when system initialising and stored in this list. Any one that needs idle event can get event from this event and return it back with FIFO policy>*/
 PRIVILEGED_DATA static xList xEventPool;  /*< Event Pool which store the events from S-Servant in terms of FIFO>*/
 PRIVILEGED_DATA static  xList xEventList;                            /*< Event List is used to store the event item in a specific order which sended or received by S-Servant.>*/
 PRIVILEGED_DATA static xList xEventExecutableList;   /*< store the executable event which satisfies the time requirement >*/
@@ -107,7 +108,6 @@ static volatile unsigned portBASE_TYPE xEventSerialNumber  = (portBASE_TYPE)0;  
 *
 * no param and no return value
 * */
-static void prvInitialiseEventLists(void ) PRIVILEGED_FUNCTION; 
 
 /* insert new event item into xEventList. */
 static void prvEventListGenericInsert1( xListItem * pxNewListItem) PRIVILEGED_FUNCTION;
@@ -139,13 +139,23 @@ static void vEventSetxTimeStamp( xEventHandle pxNewEvent );
 
 static xList * pxGetReadyList( void );
 
-static void prvInitialiseEventLists(void )
+void vInitialiseEventLists( portBASE_TYPE NumOfEvents)
 {
-    volatile portBASE_TYPE xCPU;
+    volatile portBASE_TYPE xCPU, i;
+    eveECB * pxIdleEvents[NumOfEvents];
+    eveECB * pxEndFlagEvent;
 
+    vListInitialise( ( xList * ) &xEventIdleList);
     vListInitialise( ( xList * ) &xEventPool );
     vListInitialise( ( xList * ) &xEventList );
     vListInitialise( ( xList * ) &xEventExecutableList );
+
+    for( i = 0; i < NumOfEvents; ++i )
+    {
+        pxIdleEvents[i] = (eveECB *) pvPortMalloc(sizeof(eveECB)); 
+        vListIntialiseEventItem( pxIdleEvents[i], (xListItem *) & pxIdleEvents[i]->xEventListItem );
+        vListInsertEnd(&xEventIdleList, &pxIdleEvents[i]->xEventListItem); 
+    }
 
     // init the xEventReadyList[configCPU_NUMBER].
     for ( xCPU = 0; xCPU < configCPU_NUMBER; xCPU ++ )
@@ -153,8 +163,8 @@ static void prvInitialiseEventLists(void )
         vListInitialise( (xList * ) & xEventReadyList[xCPU] );
     }
 
-    // Creating an End FLag Event and insert into the end of xEventList.
-    eveECB * pxEndFlagEvent = (eveECB *) pvPortMalloc( sizeof( eveECB ) );
+    // Creating an End FLag Event and insert into the end of xEventList, which needs sorted events
+    pxEndFlagEvent = (eveECB *) pvPortMalloc( sizeof( eveECB ) );
     if( pxEndFlagEvent != NULL )
     {
        // pxEndFlagEvent->pxSource = pxEndFlagEvent->pxDestination = NULL;
@@ -167,17 +177,17 @@ static void prvInitialiseEventLists(void )
         vListInsertEnd(&xEventList, &pxEndFlagEvent->xEventListItem); 
     }
 
-    // Creating an End FLag Event and insert into the end of xEventExecutableList
-    eveECB * pxEndFlagEvent1 = (eveECB *) pvPortMalloc( sizeof( eveECB ) );
-    if( pxEndFlagEvent1 != NULL )
+    // Creating an End FLag Event and insert into the end of xEventExecutableList, which needs sorted events
+    pxEndFlagEvent = (eveECB *) pvPortMalloc( sizeof( eveECB ) );
+    if( pxEndFlagEvent != NULL )
     {
         // there may be some problem here because of this assignment way
-        pxEndFlagEvent1->xTimeStamp.xDeadline= portMAX_DELAY;
-        pxEndFlagEvent1->xTimeStamp.xTime = portMAX_DELAY;
-        pxEndFlagEvent1->xTimeStamp.xMicroStep = portMAX_DELAY;
-        pxEndFlagEvent1->xTimeStamp.xLevel = portMAX_DELAY;
-        vListIntialiseEventItem( pxEndFlagEvent1, (xListItem *) & pxEndFlagEvent1->xEventListItem );
-        vListInsertEnd(&xEventExecutableList, &pxEndFlagEvent1->xEventListItem); 
+        pxEndFlagEvent->xTimeStamp.xDeadline= portMAX_DELAY;
+        pxEndFlagEvent->xTimeStamp.xTime = portMAX_DELAY;
+        pxEndFlagEvent->xTimeStamp.xMicroStep = portMAX_DELAY;
+        pxEndFlagEvent->xTimeStamp.xLevel = portMAX_DELAY;
+        vListIntialiseEventItem( pxEndFlagEvent, (xListItem *) & pxEndFlagEvent->xEventListItem );
+        vListInsertEnd(&xEventExecutableList, &pxEndFlagEvent->xEventListItem); 
     }
 }
 
@@ -387,14 +397,17 @@ void vEventGenericCreate( xTaskHandle pxDestination, struct eventData pdData)
     /* using the pxCurrentTCB, current task should not be changed */
     taskENTER_CRITICAL();
 
-    if ( IS_FIRST_EVENT == 1 )
+    xTaskHandle pxCurrentTCBLocal = xTaskGetCurrentTaskHandle();
+
+    // get new idle event 
+    if( listCURRENT_LIST_LENGTH(&xEventIdleList) == 0 )
     {
-        IS_FIRST_EVENT = 0;
-        prvInitialiseEventLists();
+        vPrintString(" No Idle Events available\n\r");
+        return;
     }
 
-    xTaskHandle pxCurrentTCBLocal = xTaskGetCurrentTaskHandle();
-    pxNewEvent = (eveECB *)pvPortMalloc( sizeof( eveECB ));
+    pxNewEvent = (eveECB *)xEventIdleList.xListEnd.pxNext->pvOwner;
+    vListRemove( (xListItem *)&pxNewEvent->xEventListItem );
     if( pxNewEvent == NULL )
     {
         vPrintString("malloc for event stack failed\n\r");
@@ -415,7 +428,6 @@ void vEventGenericCreate( xTaskHandle pxDestination, struct eventData pdData)
         vListInsertEnd(&xEventPool, (xListItem *)& pxNewEvent->xEventListItem);
     }
     taskEXIT_CRITICAL();
-
 }
 
 
@@ -548,7 +560,9 @@ void vEventGenericDelete( xEventHandle xEvent)
 {
     taskENTER_CRITICAL();
 
-    vPortFree( xEvent );
+    xListItem * pxEventItem = &((eveECB *)xEvent)->xEventListItem;
+    vListRemove (pxEventItem);
+    vListInsertEnd( &xEventIdleList, pxEventItem );
 
     taskEXIT_CRITICAL();
 }
