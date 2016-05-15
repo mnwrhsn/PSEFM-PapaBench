@@ -119,7 +119,7 @@ void vApplicationTickHook( void )
     portTickType xCurrentTime = xTaskGetTickCount();
     portBASE_TYPE i;
     /* init task */
-    if(xCurrentTime > 0 && xCurrentTime < 1001)
+    if(xCurrentTime > 0 && xCurrentTime < 2501)
     {
         for(i = 0; i < NUMBEROFTASK; ++i)
         {
