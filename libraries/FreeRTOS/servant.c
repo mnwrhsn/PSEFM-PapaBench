@@ -82,7 +82,7 @@
 #define SERVANT_PRINT
 //#define RSERVANT_PRINT
 //#define SENSOR_LET
-#define SERVANT_LET
+//#define SERVANT_LET
 //#define RSERVANT_LET
 #define SENSOR_FUN
 #define SERVANT_FUN
@@ -326,7 +326,7 @@ void vSensor( void * pvParameter )
             //xDatas[i].xTime = deadline -xPeriod + xLet;
         }
         // set the future model time
-        xFutureModelTime = deadline - xPeriod + xLet;
+        //xFutureModelTime = deadline - xPeriod + xLet;
 
         // create events for all destination servants of this servant. 
         vEventCreateAll( pvMyParameter, xDatas );

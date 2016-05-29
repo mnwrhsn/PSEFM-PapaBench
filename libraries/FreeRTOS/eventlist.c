@@ -488,7 +488,7 @@ portBASE_TYPE xEventListGenericTransit( xListItem ** pxEventListItem, xList ** p
         }
         else
         {
-          // no executable event in xEventList
+          // no executable event
            break; 
         }
     }
