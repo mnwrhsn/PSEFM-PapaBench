@@ -71,6 +71,7 @@
 #include "portable.h"
 #include "list.h"
 #include "FreeRTOSConfig.h"
+#include "app_config.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -87,32 +88,31 @@ extern "C" {
 /*
  * time stamp is used to mark the time to process corresponding event item. This can be used to reassigned the scheduling order of S-Servant
  * */
-struct timeStamp 
+struct tag 
 {
-    portTickType xDeadline;   /*< the slack time of destination servant in task which is used to sort the events in xEventList, and smaller xSlackTime with higher priority >*/
-    portTickType xTime;             /*< the time to be proecessed >*/
-    portBASE_TYPE xMicroStep;            /*< the order produced by the relationship between S-Servant >*/
-    portBASE_TYPE xLevel;                /*< the order produced by topology sort which dosen't take the shared resource dependencies into consideration>*/
+    portTickType xDeadline;     /*< RM. The smaller the period the task is , the higher priority the event is. >*/ 
+    portTickType xTimestamp;             /*< the time to be proecessed >*/
+    portBASE_TYPE xLevel;                /*< the depth of current servant in a task >*/ 
+    portBASE_TYPE xMicroStep;            /*< the topology order >*/ 
 };
 
 struct eventData
 {
-    portTickType xNextPeriod;
-    portTickType xTime;
-    portBASE_TYPE IS_LAST_SERVANT;
     /* data type can be changed here. Data type including portCHAR, portFLOAT, portLONG, portSHORT, portBASE_TYPE*/
-    portBASE_TYPE xData;
+    portBASE_TYPE xDataArray[MAXINDEGREE];
 };
 
 typedef void * xEventHandle;
 
-void vInitialiseEventLists(portBASE_TYPE NumOfEvents);
+void vInitialiseEventLists();
 
-portBASE_TYPE Is_Executable_Event_Arrive();
+portBASE_TYPE xIsERLNull();
 
-xTaskHandle xEventGetpxSource( xEventHandle pxEvent );
+portBASE_TYPE xIsExecutableEventArrive();
 
-xTaskHandle xEventGetpxDestination( xEventHandle pxEvent );
+portBASE_TYPE xEventGetpxSource( xEventHandle pxEvent );
+
+portBASE_TYPE  xEventGetpxDestination( xEventHandle pxEvent );
 /*
  * get the time stamp of specified pxEvent
  *
@@ -120,7 +120,7 @@ xTaskHandle xEventGetpxDestination( xEventHandle pxEvent );
  * @return the timestamp of this event item as struct timeStamp.
  * */
 
-struct timeStamp xEventGetxTimeStamp( xEventHandle pxEvent );
+struct tag xEventGetxTag( xEventHandle pxEvent );
 
 /*
  * get the data of specified event.
@@ -136,7 +136,7 @@ struct eventData xEventGetxData( xEventHandle pxEvent );
  * @param pxDestination is the destination where this event will be sent to./
  * @param pvData is the data that the event should bring along.
  * */
-void vEventGenericCreate( xTaskHandle pxDestination, struct eventData pvData);  
+xEventHandle pxEventGenericCreate( portBASE_TYPE pxSource, portTickType xDeadline, portTickType xTimestamp, struct eventData pvData);  
 
 
 /*
@@ -147,7 +147,7 @@ void vEventGenericCreate( xTaskHandle pxDestination, struct eventData pvData);
  *
  * return: 1 transmit success; -1 no event; 0 not time yet
  * */
-portBASE_TYPE xEventListGenericTransit( xListItem ** pxEvent, xList ** pxList);
+void vEventListGenericTransit(); 
 
 /*
  * servant receive event whose source is the pxSource and destination is current servant from specified xEventReadyList.
@@ -156,7 +156,8 @@ portBASE_TYPE xEventListGenericTransit( xListItem ** pxEvent, xList ** pxList);
  * @param pxSource is used to choose the right event item in xEventReadyList.
  * @param pxList is the target xEventReadyList.
  * */
-void vEventGenericReceive( xEventHandle *pxEvent, xTaskHandle pxSource, xList * pxList );
+xEventHandle pxEventGenericReceive(); 
+
 
 
 /* 
@@ -164,15 +165,38 @@ void vEventGenericReceive( xEventHandle *pxEvent, xTaskHandle pxSource, xList * 
  *
  * @param xEvent is the event item which will be destroyed and freed.
  * */
-void vEventGenericDelete ( xEventHandle xEvent);
+void vEventGenericDelete ( xEventHandle pxEvent);
 
-#define vEventCreate( pxDestination, pvData)  vEventGenericCreate(pxDestination, pvData)
+void vEventGenericSend(xEventHandle pxEvent); //  insert event into nonexecutable pool
 
-#define xEventListTransit( pxEventListItem, pxCurrentReadyList)     xEventListGenericTransit( pxEventListItem, pxCurrentReadyList)
+void vEventGenericMap(); // once a event, map one event to multiple events
 
-#define vEventReceive( pxEvent, pxSource, pxList )  vEventGenericReceive( pxEvent, pxSource, pxList )
+void vEventGenericReduce();  // reduce the mutiple event for the same destination to one event, transit them from
+                             // executable event pool to executable event list
+
+portBASE_TYPE xEventGenericSerialize(); // serialize the timestamp of simultaneous events
+                                        // and update other events who are affected by serialisation
+
+void vEventGenericUpdate( xEventHandle xEvent, portBASE_TYPE pxSource , portTickType xDeadline, portTickType xTimestamp, struct eventData xData );
+
+
+#define pxEventCreate( pxSource, xDeadline, xTimestamp, pvData)  pxEventGenericCreate(pxSource, xDeadline, xTimestamp, pvData)
+
+#define vEventListTransit()     vEventListGenericTransit()
+
+#define pxEventReceive()  pxEventGenericReceive()
+
+#define vEventSend(pxEvent) vEventGenericSend(pxEvent)
+
+#define vEventMap() vEventGenericMap()
+
+#define vEventReduce() vEventGenericReduce()
+
+#define xEventSerialize() xEventGenericSerialize()
 
 #define vEventDelete( pxEvent )     vEventGenericDelete( pxEvent )
+
+#define vEventUpdate( xEvent, pxSource, xDeadline, xTimestamp, xData ) vEventGenericUpdate( xEvent, pxSource, xDeadline, xTimestamp, xData );
 
 
 #ifdef __cplusplus

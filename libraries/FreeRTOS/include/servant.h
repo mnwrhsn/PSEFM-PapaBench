@@ -75,14 +75,18 @@
 #include "app.h"
 #include "FreeRTOSConfig.h"
 #include "FreeRTOS.h"
+#include "app_config.h"
 
+typedef void (* pvServantFunType)( struct eventData *xLoopData);
 /*
 * It is used to record the topology and basic time information of servant
 * */
-struct xParam
+struct context 
 {
     /* the topology of system */
     portBASE_TYPE xMyFlag;     // the flag of current servant
+    portBASE_TYPE xType;        // 0 is R-Servant, 1 is sensor, 2 is C-Servant, 3 is actuator
+    portBASE_TYPE xCount;       // count the number of Period that task passed, start from 1
     portBASE_TYPE xNumOfIn;    // the number of source servants
     portBASE_TYPE xNumOfOut;   // the number of destination servants
     portBASE_TYPE xInFlag[MAXINDEGREE];  // the flags of source servants
@@ -94,7 +98,8 @@ struct xParam
     /* the period of task where this servant is in (ms) */
     portTickType xPeriod;
     /* the id of task. start from 0 */
-    portBASE_TYPE xTaskFlag;
+    portBASE_TYPE xTaskId;
+    portBASE_TYPE xInBoolCount;  // count the number of events that arrived already 
 };
 
 
@@ -109,7 +114,7 @@ void vSemaphoreInitialise();
  * Initialise the paramter which will be send to each S-Servant. And
  * initialise the topology of all the S-Servant in system according to the relation table of S-Servant.
  * */
-void vParameterInitialise();
+void vContextInit();
 
 /* Occupied CPU until the output time of current Servant for keep LET semantics. */
 void vTaskDelayLET();
@@ -140,6 +145,8 @@ void vEventCreateAll( void * pvParameter, struct eventData * xDatas );
 void vSensor( void * pvParameter );
 
 void vServant( void * pvParameter );
+
+void vActuator( void * pvParameter );
 
 void vR_Servant( void * pvParameter );
 

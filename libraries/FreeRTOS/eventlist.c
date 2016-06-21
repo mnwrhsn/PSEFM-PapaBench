@@ -79,88 +79,125 @@ task.h is included from an application file. */
 #include "timers.h"
 #include "StackMacros.h"
 #include "eventlist.h"
+#include "servant.h"
 
 #undef MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 
-static  portBASE_TYPE IS_FIRST_EVENT = (portBASE_TYPE)1; /* A flag to know whether the event Lists are initialised. */
+extern struct context xContexts[NUMBEROFSERVANT];
+extern portTickType xPeriodOfTask[NUMBEROFTASK];
+
+portTickType GCDPeriod;  // the GCD of period of all tasks
+portTickType xFutureModelTime ;
 
 /* the struct of event item*/
 typedef struct eveEventControlBlock
 {
-    xTaskHandle pxSource;         /*< the S-Servant where the event item from >*/
-    xTaskHandle pxDestination;    /*< the S-Servant where the event item to >*/
-    struct timeStamp xTimeStamp;    /*< the time stamp used to sort the event item in the event list >*/
-    xListItem  xEventListItem;       /*< connect the eveECB to the xEventList by struct list>*/
+    portBASE_TYPE pxSource;         /*< the S-Servant where the event item from >*/
+    portBASE_TYPE pxDestination;    /*< the S-Servant where the event item to >*/
+    struct tag xTag;    /*< the time stamp used to sort the event item in the event list >*/
     struct eventData xData;
+    xListItem  xEventListItem;       /*< connect the eveECB to the xEventList by struct list>*/
 }eveECB;
 
 
 /* Event lists must be initialised before the first time to create an event. */
 PRIVILEGED_DATA static xList xEventIdleList;  /*< Idel events are created when system initialising and stored in this list. Any one that needs idle event can get event from this event and return it back with FIFO policy>*/
-PRIVILEGED_DATA static xList xEventPool;  /*< Event Pool which store the events from S-Servant in terms of FIFO>*/
-PRIVILEGED_DATA static  xList xEventList;                            /*< Event List is used to store the event item in a specific order which sended or received by S-Servant.>*/
+PRIVILEGED_DATA static xList xEventNonExecutablePool;  /*< Event Pool which store the events from S-Servant in terms of FIFO>*/
+PRIVILEGED_DATA static  xList xEventNonExecutableList;                            /*< Event List is used to store the event item in a specific order which sended or received by S-Servant.>*/
+PRIVILEGED_DATA static xList xEventExecutablePool;
 PRIVILEGED_DATA static xList xEventExecutableList;   /*< store the executable event which satisfies the time requirement >*/
-PRIVILEGED_DATA static xList xEventReadyList[configCPU_NUMBER];                       /*< Event list is used to store the ready to be received events. the configCPU_NUMBER is defined in freeRTOSConfig.h>*/
+PRIVILEGED_DATA static xList xEventReadyList;
 static volatile unsigned portBASE_TYPE xEventSerialNumber  = (portBASE_TYPE)0;       /* used to set the level of timestamp in event */
 
+/* insert new event item into xEventNonExecutableList or xEventExecutableList. */
+static void prvEventListGenericInsert( xListItem * pxNewListItem, portBASE_TYPE comp) PRIVILEGED_FUNCTION;
 
-/* initialise the event lists including xEventList and xEventReadyList[configCPU_NUMBER]
-*
-* no param and no return value
-* */
-
-/* insert new event item into xEventList. */
-static void prvEventListGenericInsert1( xListItem * pxNewListItem) PRIVILEGED_FUNCTION;
-
-/* insert executable event into xEventExecutableList */
-static void prvEventListGenericInsert1( xListItem * pxNewListItem) PRIVILEGED_FUNCTION;
-
-
-/* 
- * compare the two timestamp with a specified sort algorithm.
- *
- * @param1: timestamp one
- * @param2: timestamp two
- * */
 // <unexecutable, TimeStamp, deadline, level>
-static portBASE_TYPE xCompareFunction1( const struct timeStamp t1, const struct timeStamp t2 );
+static portBASE_TYPE xCompareFunction1( const struct tag t1, const struct tag t2 );
 // <executable, deadline, timestamp, level>
-static portBASE_TYPE xCompareFunction2( const struct timeStamp t1, const struct timeStamp t2 );
+static portBASE_TYPE xCompareFunction2( const struct tag t1, const struct tag t2 );
 
-
-/*
- * initialise the eventItem and ready for the insertion. Set the pvOwner and Container which is the member of List Item.
- * **/
+// init event item list 
 static void vListIntialiseEventItem( xEventHandle pvOwner, xListItem * pxNewEventItem);
 
-static void vEventSetxData( xEventHandle pxEvent, struct eventData xData);
+static void vEventSetxTag(portTickType xDeadline, portTickType xTimestamp, xEventHandle pxNewEvent );
 
-static void vEventSetxTimeStamp( xEventHandle pxNewEvent );
+// if xEventReadyList is not null,
+// then return the type of destination servant of the first event
+portBASE_TYPE xIsERLNull()
+{
+    portBASE_TYPE pxDestination;
+    struct tag xTag;
+    if(listCURRENT_LIST_LENGTH(&xEventReadyList) > 0)
+    {
+        pxDestination = xEventGetpxDestination((xEventReadyList.xListEnd.pxNext)->pvOwner); 
+        xTag = xEventGetxTag(xEventReadyList.xListEnd.pxNext->pvOwner);
+        if( xTaskGetTickCount() >= xTag.xTimestamp )
+            return xContexts[pxDestination].xType; 
+        else
+            return 0;
+    }
+    return -1;
+}
 
-static xList * pxGetReadyList( void );
+portBASE_TYPE xEventGetpxSource( xEventHandle pxEvent )
+{
+    return ((eveECB *)pxEvent)->pxSource;
+}
 
-void vInitialiseEventLists( portBASE_TYPE NumOfEvents)
+portBASE_TYPE xEventGetpxDestination( xEventHandle pxEvent)
+{
+    return ((eveECB *) pxEvent)->pxDestination;
+}
+
+struct tag xEventGetxTag( xEventHandle pxEvent)
+{
+    return ((eveECB *) pxEvent)->xTag;
+}
+
+struct eventData xEventGetxData( xEventHandle pxEvent)
+{
+    return ((eveECB *) pxEvent)->xData;
+}
+
+static portBASE_TYPE getGCD(portTickType t1, portTickType t2)
+{
+    return t1%t2==0 ? t2 : getGCD(t2, t1 % t2);
+}
+
+inline static portTickType GCDOfTaskPeriod()
+{
+    portBASE_TYPE i;
+    portTickType result = xPeriodOfTask[0];
+
+    for( i = 1; i < NUMBEROFTASK; ++ i )
+    {
+        result = getGCD(result , xPeriodOfTask[i]); 
+    }
+    return result;
+}
+
+void vInitialiseEventLists() 
 {
     volatile portBASE_TYPE xCPU, i;
-    eveECB * pxIdleEvents[NumOfEvents];
+    eveECB * pxIdleEvents[NUMBEROFEVENTS];
     eveECB * pxEndFlagEvent;
 
-    vListInitialise( ( xList * ) &xEventIdleList);
-    vListInitialise( ( xList * ) &xEventPool );
-    vListInitialise( ( xList * ) &xEventList );
-    vListInitialise( ( xList * ) &xEventExecutableList );
+    // init the GCD of Task period;
+    GCDPeriod = GCDOfTaskPeriod();
 
-    for( i = 0; i < NumOfEvents; ++i )
+    vListInitialise( ( xList * ) &xEventIdleList);
+    vListInitialise( ( xList * ) &xEventNonExecutablePool );
+    vListInitialise( ( xList * ) &xEventNonExecutableList);
+    vListInitialise( ( xList * ) &xEventExecutablePool );
+    vListInitialise( ( xList * ) &xEventExecutableList );
+    vListInitialise( (xList * ) & xEventReadyList);
+
+    for( i = 0; i < NUMBEROFEVENTS; ++i )
     {
         pxIdleEvents[i] = (eveECB *) pvPortMalloc(sizeof(eveECB)); 
         vListIntialiseEventItem( pxIdleEvents[i], (xListItem *) & pxIdleEvents[i]->xEventListItem );
         vListInsertEnd(&xEventIdleList, &pxIdleEvents[i]->xEventListItem); 
-    }
-
-    // init the xEventReadyList[configCPU_NUMBER].
-    for ( xCPU = 0; xCPU < configCPU_NUMBER; xCPU ++ )
-    {
-        vListInitialise( (xList * ) & xEventReadyList[xCPU] );
     }
 
     // Creating an End FLag Event and insert into the end of xEventList, which needs sorted events
@@ -169,12 +206,12 @@ void vInitialiseEventLists( portBASE_TYPE NumOfEvents)
     {
        // pxEndFlagEvent->pxSource = pxEndFlagEvent->pxDestination = NULL;
         // there may be some problem here because of this assignment way
-        pxEndFlagEvent->xTimeStamp.xDeadline= portMAX_DELAY;
-        pxEndFlagEvent->xTimeStamp.xTime = portMAX_DELAY;
-        pxEndFlagEvent->xTimeStamp.xMicroStep = portMAX_DELAY;
-        pxEndFlagEvent->xTimeStamp.xLevel = portMAX_DELAY;
+        pxEndFlagEvent->xTag.xDeadline= portMAX_DELAY;
+        pxEndFlagEvent->xTag.xTimestamp = portMAX_DELAY;
+        pxEndFlagEvent->xTag.xMicroStep = portMAX_DELAY;
+        pxEndFlagEvent->xTag.xLevel = portMAX_DELAY;
         vListIntialiseEventItem( pxEndFlagEvent, (xListItem *) & pxEndFlagEvent->xEventListItem );
-        vListInsertEnd(&xEventList, &pxEndFlagEvent->xEventListItem); 
+        vListInsertEnd(&xEventNonExecutableList, &pxEndFlagEvent->xEventListItem); 
     }
 
     // Creating an End FLag Event and insert into the end of xEventExecutableList, which needs sorted events
@@ -182,24 +219,40 @@ void vInitialiseEventLists( portBASE_TYPE NumOfEvents)
     if( pxEndFlagEvent != NULL )
     {
         // there may be some problem here because of this assignment way
-        pxEndFlagEvent->xTimeStamp.xDeadline= portMAX_DELAY;
-        pxEndFlagEvent->xTimeStamp.xTime = portMAX_DELAY;
-        pxEndFlagEvent->xTimeStamp.xMicroStep = portMAX_DELAY;
-        pxEndFlagEvent->xTimeStamp.xLevel = portMAX_DELAY;
+        pxEndFlagEvent->xTag.xDeadline= portMAX_DELAY;
+        pxEndFlagEvent->xTag.xTimestamp = portMAX_DELAY;
+        pxEndFlagEvent->xTag.xMicroStep = portMAX_DELAY;
+        pxEndFlagEvent->xTag.xLevel = portMAX_DELAY;
         vListIntialiseEventItem( pxEndFlagEvent, (xListItem *) & pxEndFlagEvent->xEventListItem );
         vListInsertEnd(&xEventExecutableList, &pxEndFlagEvent->xEventListItem); 
     }
 }
 
+portBASE_TYPE xIsExecutableEventArrive()
+{
+    xListItem * temp_pxEventListItem;
+    portTickType xCurrentTime;
+    struct tag xTag;
+    
+    if(listCURRENT_LIST_LENGTH(&xEventNonExecutableList) > 1)
+    {
+        temp_pxEventListItem = (xListItem *)xEventNonExecutableList.xListEnd.pxNext;
+        xTag= xEventGetxTag( (xEventHandle) (temp_pxEventListItem)->pvOwner );
+        xCurrentTime = xTaskGetTickCount();
+        return xTag.xTimestamp <= xCurrentTime? pdTRUE : pdFALSE;
+    }
+    return 0;
+}
+
 /* unexecutable event comparison function is used in xEventList. 
  * The event with earlist timestamp will be proceeded first*/
-static portBASE_TYPE xCompareFunction1( const struct timeStamp t1, const struct timeStamp t2 )
+static portBASE_TYPE xCompareFunction1( const struct tag t1, const struct tag t2 )
 {
-    if( t1.xTime < t2.xTime)
+    if( t1.xTimestamp < t2.xTimestamp)
     {
         return pdTRUE;
     }
-    else if( t1.xTime == t2.xTime)
+    else if( t1.xTimestamp == t2.xTimestamp)
     {
         if( t1.xDeadline < t2.xDeadline )
         {
@@ -211,6 +264,10 @@ static portBASE_TYPE xCompareFunction1( const struct timeStamp t1, const struct 
             {
                 return pdTRUE;
             }
+            else if( t1.xLevel == t2.xLevel && t1.xMicroStep < t2.xMicroStep )
+            {
+                return pdTRUE;
+            }
         }
     }
     return pdFALSE;
@@ -218,7 +275,7 @@ static portBASE_TYPE xCompareFunction1( const struct timeStamp t1, const struct 
 
 /* executable event comparison function is used in xEventExecutableList. 
  * The event with earlist deadline will be scheduled to execute first */
-static portBASE_TYPE xCompareFunction2( const struct timeStamp t1, const struct timeStamp t2 )
+static portBASE_TYPE xCompareFunction2( const struct tag t1, const struct tag t2 )
 {
     if( t1.xDeadline < t2.xDeadline)
     {
@@ -226,13 +283,17 @@ static portBASE_TYPE xCompareFunction2( const struct timeStamp t1, const struct 
     }
     else if( t1.xDeadline == t2.xDeadline)
     {
-        if( t1.xTime < t2.xTime )
+        if( t1.xTimestamp < t2.xTimestamp)
         {
             return pdTRUE;
         }
-        else if( t1.xTime == t2.xTime )
+        else if( t1.xTimestamp == t2.xTimestamp )
         {
             if( t1.xLevel < t2.xLevel )
+            {
+                return pdTRUE;
+            }
+            else if( t1.xLevel == t2.xLevel && t1.xMicroStep < t2.xMicroStep )
             {
                 return pdTRUE;
             }
@@ -242,131 +303,48 @@ static portBASE_TYPE xCompareFunction2( const struct timeStamp t1, const struct 
     return pdFALSE;
 }
 
-
-
-xTaskHandle xEventGetpxSource( xEventHandle pxEvent )
-{
-    return ((eveECB *)pxEvent)->pxSource;
-}
-
-xTaskHandle xEventGetpxDestination( xEventHandle pxEvent)
-{
-    return ((eveECB *) pxEvent)->pxDestination;
-}
-
-struct timeStamp xEventGetxTimeStamp( xEventHandle pxEvent)
-{
-    return ((eveECB *) pxEvent)->xTimeStamp;
-}
-
-struct eventData xEventGetxData( xEventHandle pxEvent)
-{
-    return ((eveECB *) pxEvent)->xData;
-}
-
-static void vEventSetxTimeStamp( xEventHandle pxNewEvent )
+static void vEventSetxTag( portTickType xDeadline, portTickType xTimestamp, xEventHandle pxNewEvent )
 {
     eveECB * pxEvent =(eveECB *) pxNewEvent;
-    portTickType xDeadline = pxEvent->xData.xNextPeriod;
 
     /* EDF scheduling algorithm */
-    pxEvent->xTimeStamp.xDeadline= xDeadline ;
-
-    /*set the time of this event to be processed */
-    if( pxEvent->xData.IS_LAST_SERVANT == 1 )
-    {
-        pxEvent->xTimeStamp.xTime = xDeadline;
-    }
-    else
-    {
-        pxEvent->xTimeStamp.xTime = pxEvent->xData.xTime ;
-    }
+    pxEvent->xTag.xDeadline = xDeadline ;
+    pxEvent->xTag.xTimestamp = xTimestamp;
 
     /*the microstep is not used now*/
-    pxEvent->xTimeStamp.xMicroStep = 0;
+    pxEvent->xTag.xMicroStep = 0;
 
     /* set the level of timestamp according to the topology sort result*/
-    pxEvent->xTimeStamp.xLevel = xEventSerialNumber;
+    pxEvent->xTag.xLevel = xEventSerialNumber;
 
     xEventSerialNumber++;
 }
 
-static void vEventSetxData( xEventHandle pxEvent, struct eventData xData)
-{
-    ((eveECB *) pxEvent)->xData = xData;
-}
-
-/*
-* Get the event ready list according to the multicore scheduling algorithm.
-*
-* @return the address of the event ready list.
-* */
-static xList * pxGetReadyList( void )
-{
-    return &xEventReadyList[0];
-}
-
-
-/* insert event to xEventList in terms of comparison function 1 */
-static void prvEventListGenericInsert1( xListItem *pxNewListItem )
+/* insert event to xEventNonExecutableList in terms of comparison function 1 */
+static void prvEventListGenericInsert( xListItem *pxNewListItem, portBASE_TYPE comp)
 {
     volatile xListItem *pxIterator;
-    struct timeStamp xTimeStampOfInsertion;
-    xList * pxList = &xEventList;
+    struct tag xTagOfInsertion;
+    xList * pxList; 
 
-    xTimeStampOfInsertion = xEventGetxTimeStamp(pxNewListItem->pvOwner);
+    xTagOfInsertion = xEventGetxTag(pxNewListItem->pvOwner);
 
-    if( xTimeStampOfInsertion.xTime == portMAX_DELAY )
+    if(comp == 1)
     {
-        pxIterator = pxList->xListEnd.pxPrevious;
-    }
-    else
-    {
+        pxList = &xEventNonExecutableList;
         taskENTER_CRITICAL();
-        // There must already be a End Flag Event with max timeStamp in xEventList.
-        // The End Flag Event can be the last Event to be processed, and new events
-        // are inserted before it in xEventList.
-        // The End Flag Event has been inserted when xEventList is initialised.
-        for( pxIterator = ( xListItem * ) &( pxList->xListEnd ); xCompareFunction1( xEventGetxTimeStamp( pxIterator->pxNext->pvOwner ), xTimeStampOfInsertion ); pxIterator = pxIterator->pxNext ) 
-        {
-        }
+        for( pxIterator = ( xListItem * ) &( pxList->xListEnd); 
+             xCompareFunction1( xEventGetxTag( pxIterator->pxNext->pvOwner ), xTagOfInsertion ); 
+             pxIterator = pxIterator->pxNext ) {}
         taskEXIT_CRITICAL();
     }
-
-    // insert the new event before a bigger one.
-    pxNewListItem->pxNext = pxIterator->pxNext;
-    pxNewListItem->pxNext->pxPrevious = ( volatile xListItem * ) pxNewListItem;
-    pxNewListItem->pxPrevious = pxIterator;
-    pxIterator->pxNext = ( volatile xListItem * ) pxNewListItem;
-
-    pxNewListItem->pvContainer = ( void * ) pxList;
-
-    ( pxList->uxNumberOfItems )++;
-}
-
-/* insert event to xEventExecutableList in terms of comparison function 2 */
-static void prvEventListGenericInsert2( xListItem *pxNewListItem )
-{
-    volatile xListItem *pxIterator;
-    struct timeStamp xTimeStampOfInsertion;
-    xList * pxList = &xEventExecutableList;
-
-    xTimeStampOfInsertion = xEventGetxTimeStamp(pxNewListItem->pvOwner);
-
-    if( xTimeStampOfInsertion.xTime == portMAX_DELAY )
+    else 
     {
-        pxIterator = pxList->xListEnd.pxPrevious;
-    }
-    else
-    {
+        pxList = &xEventExecutableList;
         taskENTER_CRITICAL();
-        // There must already be a End Flag Event with max timeStamp in xEventList.
-        // The End Flag Event can be the last Event to be processed, and new events
-        // are inserted before it in xEventList.
-        // The End Flag Event has been inserted when xEventList is initialised.
-        for( pxIterator = ( xListItem * ) &( pxList->xListEnd ); xCompareFunction2( xEventGetxTimeStamp( pxIterator->pxNext->pvOwner ), xTimeStampOfInsertion ); pxIterator = pxIterator->pxNext ) 
-        {
-        }
+        for( pxIterator = ( xListItem * ) &( pxList->xListEnd); 
+             xCompareFunction2( xEventGetxTag( pxIterator->pxNext->pvOwner ), xTagOfInsertion ); 
+             pxIterator = pxIterator->pxNext ) {}
         taskEXIT_CRITICAL();
     }
 
@@ -386,105 +364,65 @@ static void vListIntialiseEventItem( xEventHandle pvOwner, xListItem * pxNewEven
 {
     /* set the pvOwner of the EventItem as a event*/
     listSET_LIST_ITEM_OWNER( pxNewEventItem, pvOwner );
-    //pxNewEventItem->pvContainer = (void *) &xEventList;
 }
 
 
-void vEventGenericCreate( xTaskHandle pxDestination, struct eventData pdData)
+xEventHandle pxEventGenericCreate( portBASE_TYPE pxSource, portTickType xDeadline, portTickType xTimestamp, struct eventData pdData)
 {
     eveECB * pxNewEvent = NULL;
 
     /* using the pxCurrentTCB, current task should not be changed */
     taskENTER_CRITICAL();
 
-    xTaskHandle pxCurrentTCBLocal = xTaskGetCurrentTaskHandle();
-
-    // get new idle event 
-    if( listCURRENT_LIST_LENGTH(&xEventIdleList) == 0 )
-    {
-        vPrintString(" No Idle Events available\n\r");
-        return;
-    }
-
     pxNewEvent = (eveECB *)xEventIdleList.xListEnd.pxNext->pvOwner;
     vListRemove( (xListItem *)&pxNewEvent->xEventListItem );
-    if( pxNewEvent == NULL )
-    {
-        vPrintString("malloc for event stack failed\n\r");
-    }
-    if ( pxNewEvent != NULL )
-    {
-        pxNewEvent->pxSource = pxCurrentTCBLocal;
-        pxNewEvent->pxDestination = pxDestination;
 
-        /* initialise the time stamp of an event item according to the sort algorithm.*/
-        vEventSetxData( pxNewEvent, pdData );
+    pxNewEvent->pxSource = pxSource;
+    vEventSetxTag( xDeadline, xTimestamp, pxNewEvent );
+    ((eveECB *) pxNewEvent)->xData = pdData;
+    vListIntialiseEventItem( pxNewEvent, (xListItem *) &pxNewEvent->xEventListItem );
 
-        vEventSetxTimeStamp( pxNewEvent );
-
-        vListIntialiseEventItem( pxNewEvent, (xListItem *) &pxNewEvent->xEventListItem );
-
-        // insert the event into eventpool with O(1)
-        vListInsertEnd(&xEventPool, (xListItem *)& pxNewEvent->xEventListItem);
-    }
     taskEXIT_CRITICAL();
+
+    return pxNewEvent;
 }
 
-portBASE_TYPE Is_Executable_Event_Arrive()
+
+// An API to transfer all executable Event Items from xEventNonExecutableList to xEventExecutablePool.
+// function : transit the nonexecutable event to executable event, and update the inBoolCount of every event 
+void vEventListGenericTransit() 
 {
     xListItem * temp_pxEventListItem;
+    struct tag xTag;
+    portBASE_TYPE pxDestination;
     portTickType xCurrentTime;
-    struct timeStamp xTimeStamp;
-    
-    if(listCURRENT_LIST_LENGTH(&xEventList) > 1)
+
+    // transmit the executable event from xEventNonExecutableList to xEventExecutablePool 
+    while( listCURRENT_LIST_LENGTH( &xEventNonExecutableList) > 1 )
     {
-        temp_pxEventListItem = (xListItem *)xEventList.xListEnd.pxNext;
-        xTimeStamp = xEventGetxTimeStamp( (xEventHandle) (temp_pxEventListItem)->pvOwner );
+        temp_pxEventListItem = (xListItem *)xEventNonExecutableList.xListEnd.pxNext;
+        xTag= xEventGetxTag( temp_pxEventListItem->pvOwner );
         xCurrentTime = xTaskGetTickCount();
 
         // the event is executable
-        if( xTimeStamp.xTime <= xCurrentTime )
+        if( xTag.xTimestamp <= xCurrentTime )
         {
-            return 1;
-        }
-    }
-    return 0;
-}
+            // update the xInBoolCount of pxDestination
+            pxDestination = ((eveECB *) temp_pxEventListItem->pvOwner)->pxDestination;
+            xContexts[pxDestination].xInBoolCount ++ ;
 
-/* An API to transfer all executable Event Items from xEventList to xEventExecutableList.
-* Then, choose the first executable event item in xEventExecutableList to proceed, which means
-* transfer the executable to specific xEventReadyList according to the condition of CPU*/
-portBASE_TYPE xEventListGenericTransit( xListItem ** pxEventListItem, xList ** pxCurrentReadyList)
-{
-    xListItem * temp_pxEventListItem;
-    struct timeStamp xTimeStamp;
-    portTickType xCurrentTime;
-
-    // transmit events from event pool to xEventList according to the xCompareFunction1
-    while(listCURRENT_LIST_LENGTH( &xEventPool ) != 0)
-    {
-        temp_pxEventListItem = (xListItem *) xEventPool.xListEnd.pxNext;    
-        vListRemove(temp_pxEventListItem);
-        //how to call this funciton: vEventListInsert( newListItem ). This function add the new item into the xEventList as default
-        prvEventListGenericInsert1( temp_pxEventListItem ); 
-    }
-
-    // transmit the executable event from xEventList to xEventExecutableList 
-    while( listCURRENT_LIST_LENGTH( &xEventList ) > 1 )
-    {
-        temp_pxEventListItem = (xListItem *)xEventList.xListEnd.pxNext;
-        xTimeStamp = xEventGetxTimeStamp( (xEventHandle) (temp_pxEventListItem)->pvOwner );
-        xCurrentTime = xTaskGetTickCount();
-
-        // the event is executable
-        if( xTimeStamp.xTime <= xCurrentTime )
-        {
             taskENTER_CRITICAL();
-            /* remove pxListItem from xEventList */ 
+            /* remove pxListItem from xEventNonExecutableList */ 
             vListRemove(temp_pxEventListItem);
-            /* insert the executable event into the xEventExecutableList*/
-            prvEventListGenericInsert2(temp_pxEventListItem);
+            /* insert the executable event into the xEventExecutablePool*/
+            vListInsertEnd(&xEventExecutablePool, temp_pxEventListItem);
             taskEXIT_CRITICAL();
+#ifdef PSEFM_DEBUG
+            if( xContexts[pxDestination].xInBoolCount > xContexts[pxDestination].xNumOfIn )
+            {
+                vPrintString(" Events repeating !!!! errror in function vEventListGenericTransit\n\r");
+            }
+#endif
         }
         else
         {
@@ -492,80 +430,259 @@ portBASE_TYPE xEventListGenericTransit( xListItem ** pxEventListItem, xList ** p
            break; 
         }
     }
-
-    // if no executable event exists, then return NULL and information about not time yet
-    if( listCURRENT_LIST_LENGTH(& xEventExecutableList) == 1 )
-    {
-        *pxCurrentReadyList = NULL;
-        *pxEventListItem = NULL;
-        return 0;
-    }
-    // transmit the first executable event from xEventExecutableList to specific xEventReadyList
-    else
-    {
-        *pxCurrentReadyList = pxGetReadyList();
-        *pxEventListItem = (xListItem *) xEventExecutableList.xListEnd.pxNext;
-        
-        taskENTER_CRITICAL();
-        /* remove pxListItem from xEventList */ 
-        vListRemove(*pxEventListItem);
-        /* insert the pxListItem into the specified pxList */
-        vListInsertEnd(*pxCurrentReadyList, *pxEventListItem);
-        taskEXIT_CRITICAL();
-    }
-
-    return 1;
 }
 
-void vEventGenericReceive( xEventHandle * pxEvent, xTaskHandle pxSource, xList * pxList )
+void vEventGenericMap()
 {
-    xList * const pxConstList = pxList; 
-    if (pxList == &xEventReadyList[0])
+    portBASE_TYPE i;
+    portBASE_TYPE pxSource, outs;
+    eveECB * pxEvent; 
+    eveECB * pxCopyEvent;
+    xListItem * temp_pxEventListItem;
+
+    // event map
+    while(listCURRENT_LIST_LENGTH( &xEventNonExecutablePool ) != 0)
     {
-        //successful.
-        //helloworld();
-    }
+        temp_pxEventListItem = (xListItem *) xEventNonExecutablePool.xListEnd.pxNext;    
+        pxEvent = (eveECB *) temp_pxEventListItem->pvOwner;
+        pxSource = pxEvent->pxSource;
+        outs = xContexts[pxSource].xNumOfOut;
 
-    if( listLIST_IS_EMPTY( pxList ) )
-    {
-        *pxEvent = NULL;
-        return;
-    }
+        taskENTER_CRITICAL();
+        vListRemove(temp_pxEventListItem);
+        // complete the information of the origin event.
+        pxEvent->pxDestination = xContexts[pxSource].xOutFlag[0];
+        prvEventListGenericInsert(temp_pxEventListItem,1); 
 
-    volatile xListItem * pxFlag = pxConstList->xListEnd.pxNext;
-
-
-    taskENTER_CRITICAL();
-
-    xTaskHandle pxCurrentTCBLocal = xTaskGetCurrentTaskHandle();
-
-    /* look up in the specified xEventReadyList. */
-    for(; pxFlag != (xListItem *) ( pxConstList->xListEnd.pxPrevious); pxFlag = pxFlag->pxNext)
-    {
-        if( xEventGetpxSource((xEventHandle) pxFlag->pvOwner) == pxSource && xEventGetpxDestination((xEventHandle) pxFlag->pvOwner) == pxCurrentTCBLocal )
+        // copy one event to multiples
+        for(i = 1; i < outs; ++ i)
         {
-            *pxEvent = pxFlag->pvOwner;
-            vListRemove((xListItem *)pxFlag);
-            taskEXIT_CRITICAL();
-            return;
+            pxCopyEvent = (eveECB *)pxEventGenericCreate(pxSource, pxEvent->xTag.xDeadline, pxEvent->xTag.xTimestamp, pxEvent->xData);
+            // complete the information of the copied event.
+            pxCopyEvent->xTag.xMicroStep = i;
+            pxCopyEvent->xTag.xLevel = pxEvent->xTag.xLevel;   // copy events have all the same xLevel
+            pxCopyEvent->pxDestination = xContexts[pxSource].xOutFlag[i];
+            prvEventListGenericInsert( &pxCopyEvent->xEventListItem , 1); 
+        }
+        taskEXIT_CRITICAL();
+    }
+}
+
+void vEventGenericReduce()
+{
+    xListItem * reduce_pxEventListItem, * temp_pxEventListItem;
+    portBASE_TYPE i, pxDestination;
+    struct tag temp_tag;
+    struct eventData temp_data;
+    volatile xListItem * pxIterator1, *pxIterator2;
+    // event reduce 
+    if( listCURRENT_LIST_LENGTH(& xEventExecutablePool) > 1 )
+    {
+        // find at least all the ready event and move it to ready event list
+        // ready event has the smallest timestamp and period.
+        // if multi ready event exists, then they all have the same timestamp
+        for( pxIterator1 = ( xListItem * ) ( xEventExecutablePool.xListEnd.pxNext ); 
+                pxIterator1 != (xListItem *)&xEventExecutablePool.xListEnd; ) 
+        {
+            reduce_pxEventListItem = (xListItem *) pxIterator1; 
+            pxDestination = xEventGetpxDestination(reduce_pxEventListItem->pvOwner); 
+
+            // if the communication between servant is multiple to one,
+            // then other events for the same servant need to be found
+            if( xContexts[pxDestination].xInBoolCount == xContexts[pxDestination].xNumOfIn )
+            {
+                taskENTER_CRITICAL();
+                if(xContexts[pxDestination].xInBoolCount > 1)
+                {
+                    i = 1;
+                    for( pxIterator2 = pxIterator1->pxNext;  pxIterator2 != (xListItem *)&xEventExecutablePool.xListEnd; ) 
+                    {
+                        // find another event for the same destinate servant, copy the data to the first one
+                        if( xEventGetpxDestination(pxIterator2->pvOwner) == pxDestination ) 
+                        {
+                            // collecting data into the first event
+                            temp_data = xEventGetxData(pxIterator2->pvOwner); 
+                            ((eveECB *)reduce_pxEventListItem->pvOwner)->xData.xDataArray[i++] = temp_data.xDataArray[0];
+                            // set the timestamp to the biggest one
+                            temp_tag = xEventGetxTag(pxIterator2->pvOwner);
+                            if(((eveECB *)reduce_pxEventListItem->pvOwner)->xTag.xTimestamp < temp_tag.xTimestamp)
+                            {
+                                ((eveECB *)reduce_pxEventListItem->pvOwner)->xTag.xTimestamp = temp_tag.xTimestamp;
+                            }
+                            // delete the useless event, and return it back to event idle list
+                            temp_pxEventListItem = (xListItem *) pxIterator2; 
+                            pxIterator2 = pxIterator2->pxNext;
+                            vEventGenericDelete(temp_pxEventListItem->pvOwner); 
+                            if( i == xContexts[pxDestination].xInBoolCount )
+                            {
+                                break;   // find all event for the same servant 
+                            }
+                        }
+                        else
+                        {
+                            pxIterator2 = pxIterator2->pxNext;
+                        }
+                    }
+                }
+                xContexts[pxDestination].xInBoolCount = 0; 
+                pxIterator1 = pxIterator1->pxNext; 
+                vListRemove(reduce_pxEventListItem);
+                prvEventListGenericInsert(reduce_pxEventListItem, 2);
+                taskEXIT_CRITICAL();
+            }
+            else
+            {
+                pxIterator1 = pxIterator1->pxNext;
+            }
+
         }
     }
+}
 
-    /* we can't forget the last one item of the list. */
-    if( xEventGetpxSource((xEventHandle) pxFlag->pvOwner) == pxSource && xEventGetpxDestination((xEventHandle) pxFlag->pvOwner) == pxCurrentTCBLocal )
+
+
+static portBASE_TYPE pOverLap( xListItem * pxEventListItem)
+{
+    eveECB * pxEvent = (eveECB *)pxEventListItem->pvOwner;
+    portBASE_TYPE pxDestination = pxEvent->pxDestination; 
+    portTickType start = pxEvent->xTag.xTimestamp;
+    portTickType end   = start + xContexts[pxDestination].xLet;
+
+    // different execution time overlaped
+    if( start % GCDPeriod < INPUT || start % GCDPeriod > (GCDPeriod - OUTPUT) || 
+            end % GCDPeriod < INPUT || end % GCDPeriod > (GCDPeriod - OUTPUT))
     {
-        *pxEvent = pxFlag->pvOwner;
-        vListRemove((xListItem *)pxFlag);
-        taskEXIT_CRITICAL();
-        return;
+        return 1;
+    }
+    return 0;
+}
+
+static void xSetTimestamp( portBASE_TYPE count)
+{
+    portBASE_TYPE i;
+    eveECB *pxEvent;
+    volatile xListItem * pxIterator;
+    xListItem * temp_pxEventListItem;
+    portBASE_TYPE pxDestination;
+    
+    for( i = 0, pxIterator = xEventReadyList.xListEnd.pxNext; 
+         i < count; 
+         ++ i, pxIterator = pxIterator->pxNext )
+    {
+        pxEvent = (eveECB *) pxIterator->pvOwner;
+        pxEvent->xTag.xTimestamp = xFutureModelTime;
+        if( pOverLap( (xListItem *)pxIterator ) == 0 ) // not overlaped
+        {
+            xFutureModelTime += xContexts[pxEvent->pxDestination].xLet; // update future model time
+        }
+        else  // overlaped
+        {
+            // set the future model time to start time of next LET
+            xFutureModelTime = (xFutureModelTime/GCDPeriod) * GCDPeriod + GCDPeriod + INPUT;  
+            pxEvent->xTag.xTimestamp = xFutureModelTime;
+            xFutureModelTime += xContexts[pxEvent->pxDestination].xLet;
+
+            temp_pxEventListItem = (xListItem *)pxIterator;
+            pxIterator = pxIterator->pxNext;
+            vListRemove( temp_pxEventListItem ); 
+            vListInsertEnd(&xEventNonExecutablePool, temp_pxEventListItem);
+            break;
+        }
+    }
+    for( ; i < count; ++i)  // update the left simultaneous events and send them to event pool
+    {
+        pxEvent = (eveECB *) pxIterator->pvOwner;
+        pxEvent->xTag.xTimestamp = xFutureModelTime;
+        xFutureModelTime += xContexts[pxEvent->pxDestination].xLet;
+
+        temp_pxEventListItem = (xListItem *)pxIterator;
+        pxIterator = pxIterator->pxNext;
+        vListRemove( temp_pxEventListItem ); 
+        vListInsertEnd(&xEventNonExecutablePool, temp_pxEventListItem);
+    }
+}
+
+inline static portBASE_TYPE pTagEqual(struct tag xTag1, struct tag xTag2)
+{
+    if(xTag1.xDeadline == xTag2.xDeadline && xTag1.xTimestamp == xTag2.xTimestamp)
+    {
+        return 1;
     }
     else
     {
-        // cannot find the specified event.
-        *pxEvent = NULL;
+        return 0;
     }
+}
 
+// serialise the simultaneous events
+portBASE_TYPE xEventGenericSerialize()
+{
+    xListItem * flag_pxEventListItem, * temp_pxEventListItem;
+    portBASE_TYPE count = 0;
+
+    if(listCURRENT_LIST_LENGTH( &xEventExecutableList ) > 1)
+    {
+        flag_pxEventListItem = (xListItem *) xEventExecutableList.xListEnd.pxNext;
+        vListRemove( flag_pxEventListItem );
+        vListInsertEnd( &xEventReadyList, flag_pxEventListItem );
+        while( listCURRENT_LIST_LENGTH(&xEventExecutableList) > 1 )
+        {
+            temp_pxEventListItem = (xListItem *) xEventExecutableList.xListEnd.pxNext;
+            // transit the simultaneous event to ready list
+            if( pTagEqual( xEventGetxTag(flag_pxEventListItem->pvOwner), xEventGetxTag(temp_pxEventListItem->pvOwner)) == 1)
+            {
+                vListRemove( temp_pxEventListItem );
+                vListInsertEnd( &xEventReadyList, temp_pxEventListItem );
+                count ++;
+            }
+            else
+            {
+                break;
+            }
+        }
+        // update timestamp of ready event in terms of future model time, 
+        // which is only work for events that trigger C-Servant
+        if( xContexts[xEventGetpxDestination(flag_pxEventListItem->pvOwner)].xType == 2 )
+        {
+            xSetTimestamp( count );
+        }
+
+        if( listCURRENT_LIST_LENGTH( &xEventReadyList ) > 0 )
+        {
+            return xEventGetpxDestination(flag_pxEventListItem->pvOwner); //  the first one repsenting the type of events
+        }
+    }
+    return -1; // no event avaliable
+}
+
+void vEventGenericSend( xEventHandle pxEvent )
+{
+    vListInsertEnd(&xEventNonExecutablePool, (xListItem *)&((eveECB *)pxEvent)->xEventListItem);
+}
+
+xEventHandle pxEventGenericReceive()
+{
+    // xEventReadyList must not be null, which is ensured by servant
+
+    taskENTER_CRITICAL();
+    xListItem * pxFlag = (xListItem *)xEventReadyList.xListEnd.pxNext;
+    vListRemove(pxFlag);
+    vListInsertEnd(&xEventNonExecutablePool, pxFlag);  // reuse event, which will be update by servant 
     taskEXIT_CRITICAL();
+
+    return (xEventHandle) pxFlag->pvOwner;
+}
+
+void vEventGenericUpdate( xEventHandle xEvent, portBASE_TYPE pxSource, portTickType xDeadline, portTickType xTimestamp, struct eventData xData)
+{
+    eveECB * pxEvent = (eveECB *)xEvent;
+    pxEvent->pxSource = pxSource;
+    pxEvent->xTag.xDeadline = xDeadline;
+    pxEvent->xTag.xTimestamp = xTimestamp; 
+    pxEvent->xTag.xLevel = xEventSerialNumber;
+    pxEvent->xTag.xMicroStep = 0;
+    pxEvent->xData = xData;
+    xEventSerialNumber++;
 }
 
 void vEventGenericDelete( xEventHandle xEvent)
@@ -578,3 +695,4 @@ void vEventGenericDelete( xEventHandle xEvent)
 
     taskEXIT_CRITICAL();
 }
+

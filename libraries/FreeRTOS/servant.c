@@ -77,22 +77,11 @@
 #include "eventlist.h"
 #include "servant.h"
 #include "app.h"
-#define xFunctionTimes 100
-#define SENSOR_PRINT
-#define SERVANT_PRINT
-//#define RSERVANT_PRINT
-//#define SENSOR_LET
-//#define SERVANT_LET
-//#define RSERVANT_LET
-#define SENSOR_FUN
-#define SERVANT_FUN
 
-static portBASE_TYPE xFutureModelTime;
-xList * pxCurrentReadyList;         // record the xEventReadyList that R-Servant transit event just now
-struct xParam pvParameters[NUMBEROFSERVANT];
+struct context xContexts[NUMBEROFSERVANT];
 
-extern xSemaphoreHandle xBinarySemaphore[NUMBEROFSERVANT];  // the semaphores which are used to trigger new servant to execute
-extern xTaskHandle xTaskOfHandle[NUMBEROFSERVANT+1];         // record the handle of all S-Servant, the last one is for debugging R-Servant 
+extern xSemaphoreHandle xBinarySemaphore[NUMBEROFTHREAD];  // the semaphores which are used to trigger new servant to execute
+
 // record the relationship among servants excluding R-Servant
 //extern portBASE_TYPE xRelation[NUMBEROFSERVANT][NUMBEROFSERVANT] ;
 // the new xRelation table which is implemeted with sparse matrix
@@ -100,22 +89,23 @@ extern struct xRelationship xRelations;
 
 // the LET of all S-Servant
 extern portTickType xLetOfServant[NUMBEROFSERVANT] ;
-
 // In app.c, this is used to sepcify the function of Servant
 extern pvServantFunType xServantTable[NUMBEROFSERVANT];
-
 // record the task id where the servant is in
 extern portBASE_TYPE xTaskOfServant[NUMBEROFSERVANT];
-
 // record the period of Task
 extern portTickType xPeriodOfTask[NUMBEROFTASK];
+
+extern portBASE_TYPE xSensorOfTask[NUMBEROFTASK];
+
+extern portBASE_TYPE xActuatorOfTask[NUMBEROFTASK];
 
 /* create all semaphores which are used to triggered s-servant */
 void vSemaphoreInitialise()
 {
     portBASE_TYPE i;
 
-    for( i = 0; i < NUMBEROFSERVANT; ++ i )
+    for( i = 0; i < NUMBEROFTHREAD; ++ i )
     {
         vSemaphoreCreateBinary(xBinarySemaphore[i]);
         /* when created, it is initialised to 1. So, we take it away.*/
@@ -127,21 +117,31 @@ void vSemaphoreInitialise()
  * Set all the parameters of S-Servants.
  *
  * */
-void vParameterInitialise()
+void vContextInit()
 {
-    portBASE_TYPE i;
+    portBASE_TYPE i, j;
     portBASE_TYPE xSource, xDest;
        
     // initialise the member of pvParameters
     for( i = 0; i < NUMBEROFSERVANT; ++ i )
     {
-        pvParameters[i].xMyFlag = i;
-        pvParameters[i].xNumOfIn = 0;
-        pvParameters[i].xNumOfOut = 0;
-        pvParameters[i].xLet = xLetOfServant[i]/portTICK_RATE_MS;
-        pvParameters[i].xFp = xServantTable[i];
-        pvParameters[i].xTaskFlag = xTaskOfServant[i]; 
-        pvParameters[i].xPeriod = xPeriodOfTask[xTaskOfServant[i]]/portTICK_RATE_MS;
+        xContexts[i].xMyFlag = i;
+        xContexts[i].xType = 2;
+        xContexts[i].xCount = 1; // the first period of task is used to init system
+        xContexts[i].xNumOfIn = 0;
+        xContexts[i].xNumOfOut = 0;
+        xContexts[i].xLet = xLetOfServant[i];
+        xContexts[i].xFp = xServantTable[i];
+        xContexts[i].xTaskId = xTaskOfServant[i];
+        xContexts[i].xPeriod = xPeriodOfTask[xTaskOfServant[i]];
+        xContexts[i].xInBoolCount = 0;
+    }
+
+    // setup the type of servants who are initialised to 2
+    for( i = 0; i < NUMBEROFTASK; ++ i )
+    {
+        xContexts[xSensorOfTask[i]].xType = 1;
+        xContexts[xActuatorOfTask[i]].xType = 3;
     }
 
     // new edition with sparse matrix relation table
@@ -150,433 +150,175 @@ void vParameterInitialise()
         xSource = xRelations.xRelation[i].xInFlag;
         xDest   = xRelations.xRelation[i].xOutFlag;
 
-        pvParameters[xSource].xOutFlag[pvParameters[xSource].xNumOfOut] = xDest;
-        pvParameters[xSource].xNumOfOut ++;
+        xContexts[xSource].xOutFlag[xContexts[xSource].xNumOfOut] = xDest;
+        xContexts[xSource].xNumOfOut ++;
 
-        pvParameters[xDest].xInFlag[pvParameters[xDest].xNumOfIn] = xSource;
-        pvParameters[xDest].xNumOfIn ++;
+        xContexts[xDest].xInFlag[xContexts[xDest].xNumOfIn] = xSource;
+        xContexts[xDest].xNumOfIn ++;
     }
 }
 
-void vTaskDelayLET()
-{
-    xTaskHandle pxTaskCurrentTCBLocal = xTaskGetCurrentTaskHandle();
-    portTickType xStartTime = xTaskGetxStartTime( pxTaskCurrentTCBLocal );
-    portTickType xOutputTime = xTaskGetxLet( pxTaskCurrentTCBLocal ) + xStartTime;
-    portTickType xCurrentTime = xTaskGetTickCount();
-
-    while( xCurrentTime <  xOutputTime)
-    {
-        xCurrentTime = xTaskGetTickCount();
-    }
-}
-
-// receive all Events from sources servant, and return them through the point
-void vEventReceiveAll( void * pvParameter, xEventHandle *pxEvent )
-{
-    portBASE_TYPE i ;
-
-    portBASE_TYPE NUM = ((struct xParam *) pvParameter)->xNumOfIn;
-    portBASE_TYPE xInFlag[NUM]; 
-    portBASE_TYPE xMyFlag = ((struct xParam *) pvParameter)->xMyFlag;
-    portTickType xCurrentTime;
-   
-    xSemaphoreTake( xBinarySemaphore[xMyFlag],portMAX_DELAY );
-
-    xCurrentTime = xTaskGetTickCount(); 
-    vTaskSetxStartTime( xTaskOfHandle[xMyFlag], xCurrentTime );
-
-    for( i = 0; i < NUM; i ++ )
-    {
-        // get all the in flag
-        xInFlag[i] = ((struct xParam *) pvParameter)->xInFlag[i];
-        // receive all events which are created by source servants and return 
-        // them back to current Servant through the inout point
-        vEventReceive( &pxEvent[i], xTaskOfHandle[xInFlag[i]], pxCurrentReadyList );
-    }
-}
-
-void vEventDeleteAll( void * pvParameter, xEventHandle * pxEvent )
-{
-    portBASE_TYPE i ;
-    portBASE_TYPE NUM = ((struct xParam *) pvParameter)->xNumOfIn;
-
-    for( i = 0; i < NUM; ++i )
-    {
-        vEventDelete( pxEvent[i] );
-    }
-}
-
-
-void vEventCreateAll( void * pvParameter, struct eventData *xDatas )
-{
-    portBASE_TYPE i ;
-    portBASE_TYPE NUM = ((struct xParam *) pvParameter)->xNumOfOut;
-    portBASE_TYPE xMyFlag = ((struct xParam *)pvParameter)->xMyFlag;
-    portTickType xPeriod = ((struct xParam *) pvParameter)->xPeriod;
-    portBASE_TYPE xFlags[NUM];
-
-    for( i = 0; i < NUM; i ++ )
-    {
-        // get all flags of destination servants
-        xFlags[i] = ((struct xParam *) pvParameter)->xOutFlag[i]; 
-
-        // if current servant is the last one of task, then the event will be proceeded at the deadline
-        if( xFlags[i] <= xMyFlag )
-        {
-            xDatas[i].IS_LAST_SERVANT = 1;
-        }
-        else
-        {
-            xDatas[i].IS_LAST_SERVANT = 0;
-        }
-        // create events which would be sent to destination servants.
-        vEventCreate(xTaskOfHandle[xFlags[i]], xDatas[i]) ;
-    }
-}
-
-
-/*
-* Sensor servant, which is different from normal S-Servant and actuator, is implemeted 
-* in a different way as a result. Sensor here is implemented as a periodic servant.
-*
-* @param pvParameter is parameter from programmer.
-*
-* */
 void vSensor( void * pvParameter )
 {
-    portTickType xCurrentTime;
-
-    portBASE_TYPE i;
-    portBASE_TYPE IS_FIRST_TIME_TO_EXE = 1;
-
-    /* store the paramter into stack of servant */
-    void * pvMyParameter = pvParameter;
-
-    portBASE_TYPE NUM = ((struct xParam *) pvMyParameter)->xNumOfOut;
-    portBASE_TYPE xMyFlag = ((struct xParam *) pvMyParameter)->xMyFlag;
-    portTickType xLet = ((struct xParam *) pvMyParameter)->xLet;
-    portTickType xPeriod = ((struct xParam *) pvMyParameter)->xPeriod;
-    pvServantFunType xMyFun = ((struct xParam *) pvMyParameter)->xFp;
-
-    portBASE_TYPE xCount = 1;
-    portTickType deadline = xCount * xPeriod;
-
-    /* set the LET of Servant when it is created */
-    vTaskSetxLet(xTaskOfHandle[xMyFlag], xLet);
-    
-    /* receive the events created by the last servant of this task. */
-    xEventHandle pxEvent[NUM];
-    
-    /* create data for destination servants and initialise them */
-    struct eventData xDatas[NUM];
+    xEventHandle pxEvent;
+    portBASE_TYPE xMyFlag;
+    portTickType xPeriod;
+    portTickType xTimestamp;
+    struct eventData xMyData;
+    struct tag xMyTag;
+    portBASE_TYPE boolFlag;
 
     while(1)
     {
+        xSemaphoreTake( xBinarySemaphore[1], portMAX_DELAY );
 
-        if( IS_FIRST_TIME_TO_EXE == 1 )
+        while((boolFlag = xIsERLNull()) != -1)
         {
-            /* Waiting for the start time of task period */
-            xSemaphoreTake(xBinarySemaphore[xMyFlag], portMAX_DELAY);
-#ifdef SENSOR_PRINT
-            vPrintNumber( xMyFlag );
-            vPrintNumber( deadline ); // ready time  of task 
-#endif 
-            xCurrentTime = xTaskGetTickCount();
-#ifdef SENSOR_PRINT
-            vPrintNumber( xCurrentTime ); // start time of task
-#endif
-            vTaskSetxStartTime( xTaskOfHandle[xMyFlag], xCurrentTime );
-
-            IS_FIRST_TIME_TO_EXE = 0;
-        }
-        else
-        {
-            /* When system started, the first servant of every task is triggered to
-             * execute by the init events created by tick hook. After that, the first
-             * servant of every task is triggered by the last servant of corresponding task.
-            * */
-            vEventReceiveAll( pvMyParameter, pxEvent );
-
-#ifdef SENSOR_PRINT
-            vPrintNumber( xMyFlag );
-            vPrintNumber( deadline ); // ready time of task 
-#endif 
-            xCurrentTime = xTaskGetTickCount();
-#ifdef SENSOR_PRINT
-            vPrintNumber( xCurrentTime ); // start time of task 
-#endif
-            vTaskSetxStartTime( xTaskOfHandle[xMyFlag], xCurrentTime );
-
-            // do actuator and sensor
-#ifdef SENSOR_FUN
-            xMyFun( NULL, 0, xDatas, NUM);
-#endif
-            vEventDeleteAll(pvMyParameter, pxEvent);
-        }
-
-        // deadline is the start time of next period
-        xCount ++;
-        deadline = xCount * xPeriod; 
-
-        for( i = 0; i < NUM; i ++ )
-        {
-            xDatas[i].xNextPeriod = deadline;
-            xDatas[i].xTime = xCurrentTime + xLet;
-            //xDatas[i].xTime = deadline -xPeriod + xLet;
-        }
-        // set the future model time
-        //xFutureModelTime = deadline - xPeriod + xLet;
-
-        // create events for all destination servants of this servant. 
-        vEventCreateAll( pvMyParameter, xDatas );
-
-#ifdef SENSOR_LET
-        vTaskDelayLET();
-#endif
+            if(boolFlag == 0)
+                continue;
+            pxEvent = pxEventReceive();   // receive event from ready list and send to event pool straightly
+            xMyFlag = xEventGetpxDestination( pxEvent );
+            xMyData = xEventGetxData( pxEvent );
+            xMyTag = xEventGetxTag( pxEvent );
+            xPeriod= xContexts[xMyFlag].xPeriod;
+            xContexts[xMyFlag].xCount ++;
+            xTimestamp = xMyTag.xTimestamp + INPUT;   
+            xFutureModelTime = xTimestamp;  // init the future model time to the start of LET execution duration.
+            vPrintNumber(xMyFlag);
         
-        if( xCurrentTime > xDatas[0].xNextPeriod )
-        {
-            vPrintNumber(xDatas[0].xNextPeriod);
-            vPrintString("there are sensor missing deadline\n\r");
+            xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
+            vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData );  // reuse event
         }
 
-#ifdef SENSOR_PRINT
-
-        xCurrentTime = xTaskGetTickCount();
-        vPrintNumber( xCurrentTime );  // finish time of sensor
-        vPrintNumber( deadline );   // deadline of task
-        vPrintNumber( ( xMyFlag + 10 ) * 3 );
-#endif
-
-        xCurrentTime = xTaskGetTickCount();
-        if( xCurrentTime > 1000000 )
-        {
-            break;
-        }
-        // triggered R-Servant to execute 
-        xSemaphoreGive( xBinarySemaphore[NUMBEROFSERVANT-1] );
+        xSemaphoreGive( xBinarySemaphore[0] );
     }
 }
-
-/*
-*  Normal S-Servant is used to process the data of sensor and send them to actuator.
-*
-*  @param pvParameter is parameter from programmer
-*
-* */
 
 void vServant( void * pvParameter )
 {
-    portBASE_TYPE i;
-    void * pvMyParameter = pvParameter;
-    portTickType xCurrentTime;
-    
-    portBASE_TYPE xNumOfIn = ((struct xParam *) pvMyParameter)->xNumOfIn;
-    portBASE_TYPE xNumOfOut = ((struct xParam *) pvMyParameter)->xNumOfOut;
-    portBASE_TYPE xMyFlag = ((struct xParam *) pvMyParameter)->xMyFlag;
-    portTickType xPeriod = ((struct xParam *) pvMyParameter)->xPeriod;
-    pvServantFunType xMyFun = ((struct xParam *) pvMyParameter)->xFp;
-
-    xEventHandle pxEvent[xNumOfIn];
-    struct eventData xDatas[xNumOfOut];
-
-    /* get the LET of current servant */
-    portTickType xLet = ((struct xParam *) pvMyParameter)->xLet;
-    /* set the LET of current servant */
-    vTaskSetxLet(xTaskOfHandle[xMyFlag], xLet);
-
+    xEventHandle pxEvent;
+    portBASE_TYPE xMyFlag;
+    portBASE_TYPE pxDestination;
+    portTickType xPeriod;
+    portTickType xTimestamp;
+    struct eventData xMyData;
+    struct tag xMyTag;
+    portBASE_TYPE boolFlag;
     while(1)
     {
-        vEventReceiveAll( pvMyParameter, pxEvent );
+        xSemaphoreTake( xBinarySemaphore[2], portMAX_DELAY );
 
-#ifdef SERVANT_PRINT
-        vPrintNumber(xMyFlag);
-#endif
-        xCurrentTime = xTaskGetTickCountFromISR();
-        vTaskSetxStartTime( xTaskOfHandle[xMyFlag], xCurrentTime );
-
-        /* Here are coding for processing data of events */
-        for( i = 0; i < xNumOfOut; i ++ )
+        while((boolFlag = xIsERLNull()) != -1)
         {
-            xDatas[i] = xEventGetxData(pxEvent[i]);
-            xDatas[i].xTime = xCurrentTime + xLet;
-            //xDatas[i].xTime = xFutureModelTime + xLet;
-            //xFutureModelTime = xDatas[i].xTime;
+            if(boolFlag == 0)
+                continue;
+            pxEvent = pxEventReceive();   // receive event from ready list and send to event pool straightly
+            xMyFlag = xEventGetpxDestination( pxEvent );
+            xMyData = xEventGetxData( pxEvent );
+            xMyTag = xEventGetxTag( pxEvent );
+            xPeriod= xContexts[xMyFlag].xPeriod;
+            // set the timestamp of event in terms of destination servant
+            // if destination is actuator, then set as the EndOfLET
+            // else set as the sum of input event's timestamp and let
+            pxDestination = xContexts[xMyFlag].xOutFlag[0];
+            switch(xContexts[pxDestination].xType)
+            {
+                case 2:
+                    xTimestamp = xMyTag.xTimestamp + xContexts[xMyFlag].xLet;
+                    break;
+                case 3:
+                    // the output execution time start from 3ms before end of the task period
+                    xTimestamp = xPeriod * xContexts[xMyFlag].xCount - OUTPUT; 
+                    break;
+                default:
+                    break;
+                    // wrong events type
+            }
+            vPrintNumber(xMyFlag);
+        
+            xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
+            vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData );
         }
-
-#ifdef SERVANT_PRINT
-        vPrintNumber( xDatas[0].xNextPeriod - xPeriod ); // ready time of task
-        vPrintNumber( xCurrentTime );   // start time of current servant
-#endif
-
-#ifdef SERVANT_FUN
-        for( i = 0; i < xFunctionTimes; ++ i )
-        {
-            xMyFun(pxEvent, xNumOfIn, xDatas, xNumOfOut);
-        }
-#endif
-
-        vEventDeleteAll( pvMyParameter, pxEvent );        
-
-        vEventCreateAll( pvMyParameter, xDatas );
-
-        if( xCurrentTime > xDatas[0].xNextPeriod )
-        {
-            vPrintNumber(xDatas[0].xNextPeriod);
-            vPrintString("there are servants missing deadline\n\r");
-        }
-#ifdef SERVANT_LET
-        vTaskDelayLET();
-#endif
-
-#ifdef SERVANT_PRINT
-        xCurrentTime = xTaskGetTickCount();
-        vPrintNumber( xCurrentTime );   // finish time of current servant
-        vPrintNumber( xDatas[0].xNextPeriod ); // deadline of task
-        vPrintNumber( (xMyFlag + 10) * 3 );
-#endif
-
-        xCurrentTime = xTaskGetTickCount();
-        if( xCurrentTime > 1000000 )
-        {
-            break;
-        }
-
-        // triggered R-Servant to execute 
-        xSemaphoreGive( xBinarySemaphore[NUMBEROFSERVANT-1] );
+        xSemaphoreGive( xBinarySemaphore[0] );
     }
 }
 
-void vR_Servant( void * pvParameter)
+void vActuator( void * pvParameter )
 {
-    portBASE_TYPE i, j;
-    portBASE_TYPE xSource, xDest;
-    portBASE_TYPE HAVE_TO_SEND_SEMAPHORE; // could the semaphore be sent? 1 means yes , 0 means no
-    portBASE_TYPE xResult;
-
-    portTickType xCurrentTime;
-    void * pvMyParameter = pvParameter;
-
-    portBASE_TYPE xMyFlag = ((struct xParam *) pvMyParameter)->xMyFlag;
-    portTickType xLet = ((struct xParam *) pvMyParameter)->xLet;
-    vTaskSetxLet(xTaskOfHandle[xMyFlag], xLet);
-
-    xListItem * pxEventListItem;
-    xTaskHandle destinationTCB, sourceTCB;
+    xEventHandle pxEvent;
+    portBASE_TYPE xMyFlag;
+    portTickType xPeriod;
+    portTickType xTimestamp;
+    struct eventData xMyData;
+    struct tag xMyTag;
+    portBASE_TYPE boolFlag;
 
     while(1)
     {
-        // waiting for events created by tick hook or S-Servant
-        xSemaphoreTake( xBinarySemaphore[xMyFlag], portMAX_DELAY );
-#ifdef RSERVANT_PRINT
-        vPrintNumber( xMyFlag );
-#endif
+        xSemaphoreTake( xBinarySemaphore[3], portMAX_DELAY );
+
+        while((boolFlag = xIsERLNull()) != -1)
+        {
+            if(boolFlag == 0)
+                continue;
+
+            pxEvent = pxEventReceive();   // receive event from ready list and send to event pool straightly
+            xMyFlag = xEventGetpxDestination( pxEvent );
+            xMyData = xEventGetxData( pxEvent );
+            xMyTag = xEventGetxTag( pxEvent );
+            xPeriod = xContexts[xMyFlag].xPeriod;
+            xTimestamp = xMyTag.xTimestamp + OUTPUT;  // all sensor are scheduled to execute start from 0 to 4 ms of every period
+            vPrintNumber(xMyFlag);
         
-        xCurrentTime = xTaskGetTickCount();
-        vTaskSetxStartTime( xTaskOfHandle[xMyFlag], xCurrentTime );
-
-#ifdef RSERVANT_PRINT
-        vPrintNumber( xCurrentTime );
-#endif
-
-        // init to zero
-        HAVE_TO_SEND_SEMAPHORE = 0;
-
-        // to see whether there is a servant need to be triggered.
-        // This process could be preempted by Sensor servant.
-        while(! HAVE_TO_SEND_SEMAPHORE)
-        {
-            /*
-             * transit the event item, whose timestamp bigger or equal to current Tick Count, 
-             * from xEventList to the idlest xEvestReadyList
-             *
-             * */
-            xResult = xEventListTransit( &pxEventListItem, &pxCurrentReadyList);
-            if( xResult == 0 )
-            {
-                // not time yet
-                break;
-            }
-            else
-            {
-                // transmit success
-            }
-
-            destinationTCB = xEventGetpxDestination( pxEventListItem->pvOwner);
-            sourceTCB = xEventGetpxSource( pxEventListItem->pvOwner );
-            HAVE_TO_SEND_SEMAPHORE = 1;  // set default 1
-
-            for( i = 0; i < xRelations.xNumOfRelation; ++ i )
-            {
-                xSource = xRelations.xRelation[i].xInFlag;
-                xDest   = xRelations.xRelation[i].xOutFlag;
-
-                if( destinationTCB == xTaskOfHandle[xDest] )
-                {
-                    // find the right relation
-                    if( sourceTCB == xTaskOfHandle[xSource] )
-                    {
-                        if( xRelations.xRelation[i].xFlag == 2 )
-                        {
-                            vPrintString("Error: This event has arrived!!\n\r") ;
-                            vEventDelete( (xEventHandle) pxEventListItem->pvOwner );
-                        }
-                        else
-                        {
-                            // set the relation to 2
-                            xRelations.xRelation[i].xFlag = 2;
-                        }
-                    }
-                    // find other relation which is relative to destinationtcb
-                    else
-                    {
-                        // waiting for an events that is not arriving yet
-                        if( xRelations.xRelation[i].xFlag == 1 )
-                        {
-                            HAVE_TO_SEND_SEMAPHORE = 0;
-                        }
-                    }
-                }
-            }
-        } //  end inner while(1)
-
-        // not time yet, R-Servant should be sleep until next period of any task
-        if ( xResult == 0 )
-        {
-#ifdef RSERVANT_LET
-            vTaskDelayLET();
-#endif
-#ifdef RSERVANT_PRINT
-            xCurrentTime = xTaskGetTickCount();
-            vPrintNumber( xCurrentTime );
-            vPrintNumber( (xMyFlag + 10) * 3 );
-#endif
+            xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
+            vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData ); // update the information of output event 
         }
-        else  // triggered specified servant to execute
-        {
-            // set all the relations whose destination S-Servant is xTaskOfHandle[i] to 1.
-            for( i = 0; i < xRelations.xNumOfRelation; ++ i )
-            {
-                xDest = xRelations.xRelation[i].xOutFlag;
-                if( destinationTCB == xTaskOfHandle[xDest] )
-                {
-                    xRelations.xRelation[i].xFlag = 1;
-                    // record the number of destinationtcb in xTaskOfHandle array.
-                    j = xDest;
-                }
-            }
-#ifdef RSERVANT_LET
-            vTaskDelayLET();
-#endif
 
-#ifdef RSERVANT_PRINT
-            xCurrentTime = xTaskGetTickCount();
-            vPrintNumber( xCurrentTime );
-            vPrintNumber( (xMyFlag + 10) * 3 );
-#endif
-            // send semaphore to destinationtcb
-            xSemaphoreGive( xBinarySemaphore[j] );
+        xSemaphoreGive( xBinarySemaphore[0] );
+    }
+}
+
+
+void vR_Servant( void * pvParameter)
+{
+    portBASE_TYPE pxDestination;
+    while(1)
+    {
+        // waiting for events created by tick hook or S-Servant
+        xSemaphoreTake( xBinarySemaphore[0], portMAX_DELAY );
+
+        vPrintString("R_Servant\n\r");
+        
+        // transit the events from events pool to nonexecutable event list
+        // Copy one event to multiple when communication mode is 1 to N
+        vEventMap();
+
+        // transit the events from nonexecutable event list to executable event list
+        vEventListTransit();
+ 
+        // reduce multiple event for destination to one when communication mode is N to 1,
+        // and transit the event from executable event pool to executable event list
+        vEventReduce(); 
+
+        // serialize the timestamp of simulataneous events,
+        // and transit the ready events to ready list
+        // return the pxDestination of the first ready event in ready list
+        pxDestination = xEventSerialize(); 
+
+        switch(xContexts[pxDestination].xType)
+        {
+            case 1:
+                xSemaphoreGive( xBinarySemaphore[1] );
+                break;
+            case 2:
+                xSemaphoreGive( xBinarySemaphore[2] );
+                break;
+            case 3:
+                xSemaphoreGive( xBinarySemaphore[3] );
+                break;
+            default:
+                break;
+                // no event available 
         }
     }
 }

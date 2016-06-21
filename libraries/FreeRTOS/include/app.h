@@ -69,15 +69,8 @@
 
 
 #include "eventlist.h"
+#include "app_config.h"
 
-
-#define NUMBEROFSERVANT 35 
-#define NUMBEROFTASK 13
-#define NUMBEROFEVENTS 13  // NUMBEROFEVENTS = Sum( Max{Concurrents of Task i} )
-#define MAXRELATION NUMBEROFSERVANT 
-
-#define MAXOUTDEGREE 2   // network max in degree of every S-servant
-#define MAXINDEGREE 2  // network max out degree of every s-servant
 
 struct sparseRelation
 {
@@ -92,28 +85,52 @@ struct xRelationship
     struct sparseRelation xRelation[MAXRELATION];  // the number of effective relations among servant
 };
 
-typedef void(* pvServantFunType)(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData);
-
-void s_0(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_1(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_2(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_3(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_4(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_5(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_6(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_7(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_8(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;  
-void s_9(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_10(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_11(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_12(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_13(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_15(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_16(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_17(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_18(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_19(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
-void s_20(xEventHandle * pxEventArray, portBASE_TYPE NumOfEvent, struct eventData * pxDataArray, portBASE_TYPE NumOfData) ;
+void s_0 (struct eventData *xLoopData) ;
+void s_1 (struct eventData *xLoopData) ;
+void s_2 (struct eventData *xLoopData) ;
+void s_3 (struct eventData *xLoopData) ;
+void s_4 (struct eventData *xLoopData) ;
+void s_5 (struct eventData *xLoopData) ;
+void s_6 (struct eventData *xLoopData) ;
+void s_7 (struct eventData *xLoopData) ;
+void s_8 (struct eventData *xLoopData) ;  
+void s_9 (struct eventData *xLoopData) ;
+void s_10(struct eventData *xLoopData) ;
+void s_11(struct eventData *xLoopData) ;
+void s_12(struct eventData *xLoopData) ;
+void s_13(struct eventData *xLoopData) ;
+void s_15(struct eventData *xLoopData) ;
+void s_16(struct eventData *xLoopData) ;
+void s_17(struct eventData *xLoopData) ;
+void s_18(struct eventData *xLoopData) ;
+void s_19(struct eventData *xLoopData) ;
+void s_20(struct eventData *xLoopData) ;
+void s_21(struct eventData *xLoopData) ;
+void s_22(struct eventData *xLoopData) ;
+void s_23(struct eventData *xLoopData) ;
+void s_24(struct eventData *xLoopData) ;
+void s_25(struct eventData *xLoopData) ;
+void s_26(struct eventData *xLoopData) ;
+void s_27(struct eventData *xLoopData) ;
+void s_28(struct eventData *xLoopData) ;
+void s_29(struct eventData *xLoopData) ;
+void s_30(struct eventData *xLoopData) ;
+void s_31(struct eventData *xLoopData) ;
+void s_32(struct eventData *xLoopData) ;
+void s_33(struct eventData *xLoopData) ;
+void s_34(struct eventData *xLoopData) ;
+void s_35(struct eventData *xLoopData) ;
+void s_36(struct eventData *xLoopData) ;
+void s_37(struct eventData *xLoopData) ;
+void s_38(struct eventData *xLoopData) ;
+void s_39(struct eventData *xLoopData) ;
+void s_40(struct eventData *xLoopData) ;
+void s_41(struct eventData *xLoopData) ;
+void s_42(struct eventData *xLoopData) ;
+void s_43(struct eventData *xLoopData) ;
+void s_44(struct eventData *xLoopData) ;
+void s_45(struct eventData *xLoopData) ;
+void s_46(struct eventData *xLoopData) ;
 
 
 #endif
