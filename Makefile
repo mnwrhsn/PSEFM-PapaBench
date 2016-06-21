@@ -118,8 +118,7 @@ qemu: main.bin $(QEMU_STM32)
 #	$(QEMU_STM32) -M stm32-p103 -kernel ~/ucos_stm32.bin
 
 qemugdb: main.bin $(QEMU_STM32)
-	#$(QEMU_STM32) -M stm32-p103 -gdb tcp::3333 -S -nographic -kernel main.bin -serial pty
-	$(QEMU_STM32) -M stm32-p103 -gdb tcp::3333 -S -kernel  ~/ucos_stm32.bin 
+	$(QEMU_STM32) -M stm32-p103 -gdb tcp::3333 -S -nographic -kernel main.bin -serial pty
 
 qemuauto: main.bin
 	bash emulate.sh main.bin

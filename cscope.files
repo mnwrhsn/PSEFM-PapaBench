@@ -317,6 +317,7 @@
 /home/wanbo/program/PSEFM+papabench/higher_PSEFM+papabench/libraries/FreeRTOS/include/task.h
 /home/wanbo/program/PSEFM+papabench/higher_PSEFM+papabench/libraries/FreeRTOS/include/eventlist.h
 /home/wanbo/program/PSEFM+papabench/higher_PSEFM+papabench/libraries/FreeRTOS/include/semphr.h
+/home/wanbo/program/PSEFM+papabench/higher_PSEFM+papabench/libraries/FreeRTOS/include/app_config.h
 /home/wanbo/program/PSEFM+papabench/higher_PSEFM+papabench/libraries/FreeRTOS/include/projdefs.h
 /home/wanbo/program/PSEFM+papabench/higher_PSEFM+papabench/libraries/FreeRTOS/include/StackMacros.h
 /home/wanbo/program/PSEFM+papabench/higher_PSEFM+papabench/libraries/FreeRTOS/include/timers.h

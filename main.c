@@ -19,27 +19,26 @@
 #include "eventlist.h"
 #include "servant.h"
 #include "app.h"
+#include "app_config.h"
 
-static portBASE_TYPE IS_INIT[NUMBEROFTASK];
 static void setup_hardware( void );
-
-extern struct xParam pvParameters[NUMBEROFSERVANT];
+xTaskHandle xTaskOfHandle[NUMBEROFTHREAD];         
 
 extern xSemaphoreHandle xBinarySemaphore[NUMBEROFSERVANT];  // the network topology
-extern xTaskHandle xTaskOfHandle[NUMBEROFSERVANT];         // record the handle of all S-Servant, the last one is for debugging R-Servant
-
 extern portTickType xPeriodOfTask[NUMBEROFTASK];
 extern portBASE_TYPE xSensorOfTask[NUMBEROFTASK];
+extern portBASE_TYPE xActuatorOfTask[NUMBEROFTASK];
 
-extern xTaskComplete[NUMBEROFTASK];
-
-
-void vInitInitialise()
+// init program to start all task when system init
+void vStartTask()
 {
     portBASE_TYPE i;
-    for(i = 0; i < NUMBEROFTASK; ++ i)
+    xEventHandle pxEvent;
+    struct eventData null_data;
+    for( i = 0; i < NUMBEROFTASK; ++i )
     {
-        IS_INIT[i] = 0;
+        pxEvent = pxEventCreate(xActuatorOfTask[i], xPeriodOfTask[i], xPeriodOfTask[i], null_data);
+        vEventSend( pxEvent );   
     }
 }
 
@@ -51,38 +50,19 @@ int main(void)
     enable_rs232_interrupts();
     enable_rs232();
 
-    //vTaskCompleteInitialise();
-    vInitInitialise();
     vSemaphoreInitialise();
-    vParameterInitialise();
-    vInitialiseEventLists(NUMBEROFEVENTS);  // parameter from app.h 
+    vContextInit();
+    vInitialiseEventLists();  
+    vStartTask();
     portBASE_TYPE i,j;
     portBASE_TYPE flag = 0;
 
-    xTaskCreate( vR_Servant, "R-Servant", SERVANT_STACK_SIZE, (void *)&pvParameters[NUMBEROFSERVANT-1],tskIDLE_PRIORITY + 1, &xTaskOfHandle[NUMBEROFSERVANT-1]);
+    xTaskCreate( vR_Servant, "R-Servant", SERVANT_STACK_SIZE, NULL,tskIDLE_PRIORITY + 1, &xTaskOfHandle[0]);
+    xTaskCreate( vSensor, "I-Servant", SERVANT_STACK_SIZE, NULL,tskIDLE_PRIORITY + 4, &xTaskOfHandle[1]);
+    xTaskCreate( vServant, "C-Servant", SERVANT_STACK_SIZE, NULL,tskIDLE_PRIORITY + 2, &xTaskOfHandle[2]);
+    xTaskCreate( vActuator, "O-Servant", SERVANT_STACK_SIZE, NULL,tskIDLE_PRIORITY + 3, &xTaskOfHandle[3]);
 
-    for( i = 0; i < NUMBEROFSERVANT-1; ++ i )
-    {
-        for(j = 0; j < NUMBEROFTASK; ++ j)
-        {
-            if( i == xSensorOfTask[j] )
-            {
-                flag = 1;  // sensor 
-                break;
-            }
-        }
-        // create sensor 
-        if(flag == 1)
-        {
-            flag = 0; 
-            xTaskCreate( vSensor, "sensor", SERVANT_STACK_SIZE, (void *)&pvParameters[i], tskIDLE_PRIORITY + 2, &xTaskOfHandle[i] );
-        }
-        else  // create servant
-        {
-            xTaskCreate( vServant, "servant", SERVANT_STACK_SIZE, (void *)&pvParameters[i], tskIDLE_PRIORITY + 2, &xTaskOfHandle[i] );
-        }
-    }
-    /* Start running the task. */
+    xSemaphoreGive(xBinarySemaphore[0]);
     vTaskStartScheduler();
 
     return 0;
@@ -97,47 +77,12 @@ void myTraceSwitchedIn  (){
 void myTraceSwitchedOut	(){
 }
 
-/*
-inline float myTraceGetTick(){
-	// 0xE000E014 -> Systick reload value
-	// 0xE000E018 -> Systick current value
-	return ((float)((*(unsigned long *)0xE000E014)-(*(unsigned long *)0xE000E018)))/(*(unsigned long *)0xE000E014);
-}
-
-inline unsigned long myTraceGetTimeMillisecond(){
-	return (xTaskGetTickCountFromISR() + myTraceGetTick()) * 1000 / configTICK_RATE_HZ;
-}
-*/
-
-/* time tick hook which is used to triggered every sensor of corresponding task to execute at
- * specified time according to their period.
- *
+ /*
  * if there is any task need to be triggered at this time,
  * tick hook function would send semaphore to them.
  * */
 void vApplicationTickHook( void )
 {
-    portTickType xCurrentTime = xTaskGetTickCount();
-    portBASE_TYPE i;
-    /* init task */
-    if(xCurrentTime > 0 && xCurrentTime < 2501)
-    {
-        for(i = 0; i < NUMBEROFTASK; ++i)
-        {
-            if( IS_INIT[i] == 0 && xCurrentTime % xPeriodOfTask[i] == 0 )
-            {
-                IS_INIT[i] = 1;
-                xSemaphoreGive( xBinarySemaphore[xSensorOfTask[i]] );
-            }
-        }
-
-    }
-    
-    // R-Servant will be suspend when no events need to be proceeded.
-    // As a result, we need to send semaphore to R-Servant to triggered it processing events 
-    // when time meeting the start time of every task period
-    if(Is_Executable_Event_Arrive())
-    {
-       xSemaphoreGive( xBinarySemaphore[NUMBEROFSERVANT - 1] ); 
-    }
+    if(xIsExecutableEventArrive())
+       xSemaphoreGive( xBinarySemaphore[0] ); 
 }
