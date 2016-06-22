@@ -190,7 +190,6 @@ void vSensor( void * pvParameter )
             //xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
             vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData );  // reuse event
         }
-
         xSemaphoreGive( xBinarySemaphore[0] );
     }
 }
@@ -244,6 +243,7 @@ void vServant( void * pvParameter )
         }
         xSemaphoreGive( xBinarySemaphore[0] );
     }
+
 }
 
 void vActuator( void * pvParameter )
@@ -278,7 +278,6 @@ void vActuator( void * pvParameter )
             //xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
             vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData ); // update the information of output event 
         }
-
         xSemaphoreGive( xBinarySemaphore[0] );
     }
 }

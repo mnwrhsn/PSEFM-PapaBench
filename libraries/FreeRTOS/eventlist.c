@@ -440,7 +440,7 @@ void vEventGenericMap()
         vListRemove(temp_pxEventListItem);
         // complete the information of the origin event.
         pxEvent->pxDestination = xContexts[pxSource].xOutFlag[0];
-        pxEvent->xTag.xLevel = xContexts[pxEvent->pxDestination].xMyFlag;
+        pxEvent->xTag.xLevel = xContexts[pxEvent->pxDestination].xTaskId;
         prvEventListGenericInsert(temp_pxEventListItem,1); 
 
         // copy one event to multiples
