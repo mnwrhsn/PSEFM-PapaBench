@@ -107,7 +107,6 @@ PRIVILEGED_DATA static  xList xEventNonExecutableList;                          
 PRIVILEGED_DATA static xList xEventExecutablePool;
 PRIVILEGED_DATA static xList xEventExecutableList;   /*< store the executable event which satisfies the time requirement >*/
 PRIVILEGED_DATA static xList xEventReadyList;
-static volatile unsigned portBASE_TYPE xEventSerialNumber  = (portBASE_TYPE)0;       /* used to set the level of timestamp in event */
 
 /* insert new event item into xEventNonExecutableList or xEventExecutableList. */
 static void prvEventListGenericInsert( xListItem * pxNewListItem, portBASE_TYPE comp) PRIVILEGED_FUNCTION;
@@ -313,11 +312,6 @@ static void vEventSetxTag( portTickType xDeadline, portTickType xTimestamp, xEve
 
     /*the microstep is not used now*/
     pxEvent->xTag.xMicroStep = 0;
-
-    /* set the level of timestamp according to the topology sort result*/
-    pxEvent->xTag.xLevel = xEventSerialNumber;
-
-    xEventSerialNumber++;
 }
 
 /* insert event to xEventNonExecutableList in terms of comparison function 1 */
@@ -446,6 +440,7 @@ void vEventGenericMap()
         vListRemove(temp_pxEventListItem);
         // complete the information of the origin event.
         pxEvent->pxDestination = xContexts[pxSource].xOutFlag[0];
+        pxEvent->xTag.xLevel = xContexts[pxEvent->pxDestination].xMyFlag;
         prvEventListGenericInsert(temp_pxEventListItem,1); 
 
         // copy one event to multiples
@@ -652,10 +647,8 @@ void vEventGenericUpdate( xEventHandle xEvent, portBASE_TYPE pxSource, portTickT
     pxEvent->pxSource = pxSource;
     pxEvent->xTag.xDeadline = xDeadline;
     pxEvent->xTag.xTimestamp = xTimestamp; 
-    pxEvent->xTag.xLevel = xEventSerialNumber;
     pxEvent->xTag.xMicroStep = 0;
     pxEvent->xData = xData;
-    xEventSerialNumber++;
 }
 
 void vEventGenericDelete( xEventHandle xEvent)
