@@ -291,6 +291,7 @@ void vR_Servant( void * pvParameter)
     {
         // waiting for events created by tick hook or S-Servant
         xSemaphoreTake( xBinarySemaphore[0], portMAX_DELAY );
+        vPrintString("Actuator\n\r");
 
         // transit the events from events pool to nonexecutable event list
         // Copy one event to multiple when communication mode is 1 to N
