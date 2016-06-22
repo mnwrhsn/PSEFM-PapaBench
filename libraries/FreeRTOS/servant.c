@@ -185,8 +185,9 @@ void vSensor( void * pvParameter )
             xTimestamp = xMyTag.xTimestamp + INPUT;   
             xFutureModelTime = xTimestamp;  // init the future model time to the start of LET execution duration.
             vPrintNumber(xMyFlag);
+            vPrintNumber(xTaskGetTickCount());
         
-            xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
+            //xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
             vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData );  // reuse event
         }
 
@@ -217,6 +218,7 @@ void vServant( void * pvParameter )
             xMyData = xEventGetxData( pxEvent );
             xMyTag = xEventGetxTag( pxEvent );
             xPeriod= xContexts[xMyFlag].xPeriod;
+            xContexts[xMyFlag].xCount ++;
             // set the timestamp of event in terms of destination servant
             // if destination is actuator, then set as the EndOfLET
             // else set as the sum of input event's timestamp and let
@@ -235,8 +237,9 @@ void vServant( void * pvParameter )
                     // wrong events type
             }
             vPrintNumber(xMyFlag);
+            vPrintNumber(xTaskGetTickCount());
         
-            xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
+            //xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
             vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData );
         }
         xSemaphoreGive( xBinarySemaphore[0] );
@@ -267,10 +270,12 @@ void vActuator( void * pvParameter )
             xMyData = xEventGetxData( pxEvent );
             xMyTag = xEventGetxTag( pxEvent );
             xPeriod = xContexts[xMyFlag].xPeriod;
+            xContexts[xMyFlag].xCount ++;
             xTimestamp = xMyTag.xTimestamp + OUTPUT;  // all sensor are scheduled to execute start from 0 to 4 ms of every period
             vPrintNumber(xMyFlag);
+            vPrintNumber(xTaskGetTickCount());
         
-            xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
+            //xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
             vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData ); // update the information of output event 
         }
 
@@ -287,8 +292,6 @@ void vR_Servant( void * pvParameter)
         // waiting for events created by tick hook or S-Servant
         xSemaphoreTake( xBinarySemaphore[0], portMAX_DELAY );
 
-        vPrintString("R_Servant\n\r");
-        
         // transit the events from events pool to nonexecutable event list
         // Copy one event to multiple when communication mode is 1 to N
         vEventMap();

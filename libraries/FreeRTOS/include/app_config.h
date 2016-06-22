@@ -9,8 +9,8 @@ extern portTickType xFutureModelTime;
 #define NUMBEROFEVENTS 13  // NUMBEROFEVENTS = Sum( Max{Concurrents of Task i} )
 #define MAXRELATION NUMBEROFSERVANT 
 
-#define INPUT 30 // the execution time of INPUT
-#define OUTPUT 30 // the execution time of OUTPUT
+#define INPUT 3 // the execution time of INPUT
+#define OUTPUT 3 // the execution time of OUTPUT
 
 #define MAXOUTDEGREE 2   // network max in degree of every S-servant
 #define MAXINDEGREE 2  // network max out degree of every s-servant

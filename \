@@ -417,6 +417,13 @@ void vEventListGenericTransit()
             /* insert the executable event into the xEventExecutablePool*/
             vListInsertEnd(&xEventExecutablePool, temp_pxEventListItem);
             taskEXIT_CRITICAL();
+#define PSEFM_DEBUG
+#ifdef PSEFM_DEBUG
+            if( xContexts[pxDestination].xInBoolCount > xContexts[pxDestination].xNumOfIn )
+            {
+                vPrintString(" Events repeating !!!! errror in function vEventListGenericTransit\n\r");
+            }
+#endif
         }
         else
         {
@@ -470,7 +477,7 @@ void vEventGenericReduce()
     struct eventData temp_data;
     volatile xListItem * pxIterator1, *pxIterator2;
     // event reduce 
-    if( listCURRENT_LIST_LENGTH(& xEventExecutablePool) > 0 )
+    if( listCURRENT_LIST_LENGTH(& xEventExecutablePool) > 1 )
     {
         // find at least all the ready event and move it to ready event list
         // ready event has the smallest timestamp and period.
@@ -551,79 +558,99 @@ static portBASE_TYPE pOverLap( xListItem * pxEventListItem)
     return 0;
 }
 
-static void xSetTimestamp( xListItem * pxEventListItem)
+static void xSetTimestamp( )
 {
     portBASE_TYPE i;
-    eveECB *pxEvent;  
+    eveECB *pxEvent;
+    volatile xListItem * pxIterator;
+    xListItem * temp_pxEventListItem;
+    portBASE_TYPE pxDestination;
     
-    pxEvent = (eveECB *) pxEventListItem->pvOwner;
-    pxEvent->xTag.xTimestamp = xFutureModelTime;
+    for( i = 0, pxIterator = xEventReadyList.xListEnd.pxNext; 
+         i < count; 
+         ++ i, pxIterator = pxIterator->pxNext )
+    {
+        pxEvent = (eveECB *) pxIterator->pvOwner;
+        pxEvent->xTag.xTimestamp = xFutureModelTime;
+        if( pOverLap( (xListItem *)pxIterator ) == 0 ) // not overlaped
+        {
+            xFutureModelTime += xContexts[pxEvent->pxDestination].xLet; // update future model time
+        }
+        else  // overlaped
+        {
+            // set the future model time to start time of next LET
+            xFutureModelTime = (xFutureModelTime/GCDPeriod) * GCDPeriod + GCDPeriod + INPUT;  
+            pxEvent->xTag.xTimestamp = xFutureModelTime;
+            xFutureModelTime += xContexts[pxEvent->pxDestination].xLet;
 
-    if( pOverLap(pxEventListItem )== 0 ) // not overlaped
-    {
-        xFutureModelTime += xContexts[pxEvent->pxDestination].xLet; // update future model time
-        vListRemove( pxEventListItem); 
-        vListInsertEnd(&xEventReadyList, pxEventListItem);
+            temp_pxEventListItem = (xListItem *)pxIterator;
+            pxIterator = pxIterator->pxNext;
+            vListRemove( temp_pxEventListItem ); 
+            vListInsertEnd(&xEventNonExecutablePool, temp_pxEventListItem);
+            break;
+        }
     }
-    else  // overlaped
+    for( ; i < count; ++i)  // update the left simultaneous events and send them to event pool
     {
-        // set the future model time to start time of next LET
-        xFutureModelTime = (xFutureModelTime/GCDPeriod) * GCDPeriod + GCDPeriod + INPUT;  
+        pxEvent = (eveECB *) pxIterator->pvOwner;
         pxEvent->xTag.xTimestamp = xFutureModelTime;
         xFutureModelTime += xContexts[pxEvent->pxDestination].xLet;
 
-        vListRemove( pxEventListItem); 
-        vListInsertEnd(&xEventNonExecutablePool, pxEventListItem);
+        temp_pxEventListItem = (xListItem *)pxIterator;
+        pxIterator = pxIterator->pxNext;
+        vListRemove( temp_pxEventListItem ); 
+        vListInsertEnd(&xEventNonExecutablePool, temp_pxEventListItem);
     }
 }
 
-inline static portBASE_TYPE pEqualxDeadline(struct tag xTag1, struct tag xTag2)
+inline static portBASE_TYPE pTagEqual(struct tag xTag1, struct tag xTag2)
 {
-    return (xTag1.xDeadline == xTag2.xDeadline);
+    if(xTag1.xDeadline == xTag2.xDeadline && xTag1.xTimestamp == xTag2.xTimestamp)
+    {
+        return 1;
+    }
+    else
+    {
+        return 0;
+    }
 }
 
 // update the timestamp of event in xEventExecutableList in terms of xFutureModelTime
 portBASE_TYPE xEventGenericSerialize()
 {
-    xListItem * flag_pxEventListItem;
-    struct tag origin_tag;
+    xListItem * flag_pxEventListItem, * temp_pxEventListItem;
     portBASE_TYPE count = 1;
 
-    if( listCURRENT_LIST_LENGTH( &xEventExecutableList ) > 1 )
-    {
-        origin_tag = xEventGetxTag( (xEventExecutableList.xListEnd.pxNext)->pvOwner );
-    }
-    
     while( listCURRENT_LIST_LENGTH(&xEventExecutableList) > 1 )
     {
         flag_pxEventListItem = (xListItem *) xEventExecutableList.xListEnd.pxNext;
-        // only the timestamp of c_servant need updating
-        // only remove events that have same xDeadline with the first event in xEventExecutableList to xEventReadyList
-
         if( xContexts[xEventGetpxDestination(flag_pxEventListItem->pvOwner)].xType == 2 )
         {
-            if( pEqualxDeadline( xEventGetxTag( flag_pxEventListItem->pvOwner ), origin_tag ))
-            {
-                // update the timestamp of event
-                // if overlaped, then remove the event to xEventNonExecutablePool
-                // else, remove the event to xEvenReadyList
-                xSetTimestamp( flag_pxEventListItem);
-            }
-            else
-            {
-                break;
-            }
+            // update the timestamp of event
+            // if overlaped, then remove the event to xEventNonExecutablePool
+            // else, remove the event to xEvenReadyList
+            xSetTimestamp( flag_pxEventListItem);
         }
-        else
+
+        vListRemove( flag_pxEventListItem );
+        vListInsertEnd( &xEventReadyList, flag_pxEventListItem );
+        temp_pxEventListItem = (xListItem *) xEventExecutableList.xListEnd.pxNext;
+        // transit the simultaneous event to ready list
+        // update timestamp of ready event in terms of future model time, 
+        // which is only work for events that trigger C-Servant
+
+
+        if( pTagEqual( xEventGetxTag(flag_pxEventListItem->pvOwner), xEventGetxTag(temp_pxEventListItem->pvOwner)) == 1)
         {
-            vListRemove( flag_pxEventListItem );
-            vListInsertEnd( &xEventReadyList, flag_pxEventListItem );
+            vListRemove( temp_pxEventListItem );
+            vListInsertEnd( &xEventReadyList, temp_pxEventListItem );
+            count ++;
         }
     }
 
     if( listCURRENT_LIST_LENGTH( &xEventReadyList ) > 0 )
     {
-        return xEventGetpxDestination((xEventReadyList.xListEnd.pxNext)->pvOwner); //  the first one repsenting the type of events
+        return xEventGetpxDestination(flag_pxEventListItem->pvOwner); //  the first one repsenting the type of events
     }
     return -1; // no event avaliable
 }

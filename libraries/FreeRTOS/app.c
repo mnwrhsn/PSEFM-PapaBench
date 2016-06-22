@@ -94,7 +94,19 @@ xSemaphoreHandle xBinarySemaphore[NUMBEROFSERVANT];  // the semaphores which are
 
 portTickType xPeriodOfTask[NUMBEROFTASK] =
 {
-    250 , 250 , 500 , 500 , 500 , 250 , 500 , 500 , 2500, 2500, 2500, 2500, 1000  
+    25 , 
+    25 , 
+    50 , 
+    50 , 
+    50 , 
+    25 , 
+    50 , 
+    50 , 
+    250, 
+    250, 
+    250, 
+    250, 
+    100  
 };
 
 portBASE_TYPE xSensorOfTask[NUMBEROFTASK] =
@@ -110,103 +122,103 @@ portBASE_TYPE xActuatorOfTask[NUMBEROFTASK] =
 
 portTickType xLetOfServant[NUMBEROFSERVANT] = 
 { 
-    2 ,  // task 0
-    20,   //
-    20,    //
-    2,    //
-    2,      // task 1
-    20,    //
-    20,    //
-    2,    //
-    2,      // task 2
-    20,    //
-    2,    //
-    2,      // task 3
-    20,    //
-    2,    //
-    2,      // task 4
-    20,    //
-    2,    //
-    2,      // task 5
-    20,    //
-    20,    //
-    2,    //
-    2,      // task 6
-    20,    //
-    20,    //
-    20,    //
-    2,    //
-    2,      // task 7
-    20,    //
-    2,    //
-    2,      // task 8
-    20,    //
-    20,    //
-    2,    //
-    2,      // task 9
-    20,    //
-    20,    //
-    20,    //
-    2,    //
-    2,      // task 10
-    20,    //
-    2,    //
-    2,      // task 11
-    20,    //
-    2,    //
-    2,      // task 12
-    20,    //
-    2,
+    1,  // task 0
+    1,   //
+    1,    //
+    1,   //
+    1,     // task 1
+    1,    //
+    1,    //
+    1,   //
+    1,     // task 2
+    1,    //
+    1,   //
+    1,     // task 3
+    1,    //
+    1,   //
+    1,     // task 4
+    1,    //
+    1,   //
+    1,     // task 5
+    1,    //
+    1,    //
+    1,   //
+    1,     // task 6
+    1,    //
+    1,    //
+    1,    //
+    1,   //
+    1,     // task 7
+    1,    //
+    1,   //
+    1,     // task 8
+    1,    //
+    1,    //
+    1,   //
+    1,     // task 9
+    1,    //
+    1,    //
+    1,    //
+    1,   //
+    1,     // task 10
+    1,    //
+    1,   //
+    1,     // task 11
+    1,    //
+    1,   //
+    1,     // task 12
+    1,    //
+    1,
 };
 
 // mark the task id of every s-servant 100
 portBASE_TYPE xTaskOfServant[NUMBEROFSERVANT] =
 {
-    0, 
+    0, //task 1
     0, 
     0,
     0,
+    1, // task 2
     1,
     1,
     1,
-    1,
+    2, // task 3
     2,
     2,
-    2,
+    3, // task 4
     3,
     3,
-    3,
+    4, // task 5
     4,
     4,
-    4,
+    5, // task 6
     5,
     5,
     5,
-    5,
-    6,
+    6, // task 7
     6,
     6,
     6,
     6, 
+    7, // task 8
     7,
     7,
-    7,
-    8,
+    8, // task 9
     8,
     8, 
     8, 
+    9, // task 10
     9,
     9,
     9,
     9,
-    9,
+    10, // task 11
     10,
     10,
-    10,
+    11, // task 12
     11,
     11,
-    11,
-    12, 
+    12,  // task 13
     12, 
     12, 
 };
@@ -224,11 +236,11 @@ struct xRelationship xRelations =
         {6, 7, 1},
         {7, 4, 1},
         {8, 9, 1}, // task 2
-        {9, 10, 1},  
-        {10, 8, 1},  
-        {11, 12, 1}, // task 3
-        {12, 13, 1},
-        {13, 11, 1},
+        {9, 10,1},  
+        {10,8, 1},  
+        {11,12,1}, // task 3
+        {12,13,1},
+        {13,11,1},
         {14,15,1}, // task 4
         {15,16,1},
         {16,14,1},
