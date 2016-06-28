@@ -147,7 +147,7 @@ xEventHandle pxEventGenericCreate( portBASE_TYPE pxSource, portTickType xDeadlin
  *
  * return: 1 transmit success; -1 no event; 0 not time yet
  * */
-void vEventListGenericTransit(); 
+void vEventGenericTransit(); 
 
 /*
  * servant receive event whose source is the pxSource and destination is current servant from specified xEventReadyList.
@@ -169,7 +169,7 @@ void vEventGenericDelete ( xEventHandle pxEvent);
 
 void vEventGenericSend(xEventHandle pxEvent); //  insert event into nonexecutable pool
 
-void vEventGenericMap(); // once a event, map one event to multiple events
+void vEventGenericScatter(); // once a event, map one event to multiple events
 
 void vEventGenericReduce();  // reduce the mutiple event for the same destination to one event, transit them from
                              // executable event pool to executable event list
@@ -182,13 +182,13 @@ void vEventGenericUpdate( xEventHandle xEvent, portBASE_TYPE pxSource , portTick
 
 #define pxEventCreate( pxSource, xDeadline, xTimestamp, pvData)  pxEventGenericCreate(pxSource, xDeadline, xTimestamp, pvData)
 
-#define vEventListTransit()     vEventListGenericTransit()
+#define vEventTransit()     vEventGenericTransit()
 
 #define pxEventReceive()  pxEventGenericReceive()
 
 #define vEventSend(pxEvent) vEventGenericSend(pxEvent)
 
-#define vEventMap() vEventGenericMap()
+#define vEventScatter() vEventGenericScatter()
 
 #define vEventReduce() vEventGenericReduce()
 

@@ -101,7 +101,7 @@ void send_data_to_autopilot_task(void)
 	//vPrintString("S_2 send_data_to_autopilot_task start! \n\r"); //SunnyBeike
 
     // modified by wanbo
-//   if ( !SpiIsSelected() && spi_was_interrupted ) 
+   if ( !SpiIsSelected() && spi_was_interrupted ) 
    {
       spi_was_interrupted = FALSE;
       to_autopilot_from_last_radio();
@@ -188,7 +188,7 @@ void test_ppm_task(void)
 {
 	//vPrintString("S_1 test_ppm_task start! \n\r"); //SunnyBeike
     // modified by wanbo
-    //if( ppm_valid ) 
+    if( ppm_valid ) 
     {
       ppm_valid = FALSE;
       ppm_cpt++;
@@ -196,7 +196,7 @@ void test_ppm_task(void)
       radio_really_lost = FALSE;
       time_since_last_ppm = 0;
       last_radio_from_ppm();
-      //if (last_radio_contains_avg_channels) 
+      if (last_radio_contains_avg_channels) 
       {
 	mode = MODE_OF_PPRZ(last_radio[RADIO_MODE]);
       }
@@ -205,15 +205,15 @@ void test_ppm_task(void)
 	servo_set(last_radio);
       }
     } 
-    //else if (mode == MODE_MANUAL && radio_really_lost) 
+    else if (mode == MODE_MANUAL && radio_really_lost) 
     {
       mode = MODE_AUTO;
     }
-    //if (time_since_last_ppm >= STALLED_TIME) 
+    if (time_since_last_ppm >= STALLED_TIME) 
     {
       radio_ok = FALSE;
     }
-    //if (time_since_last_ppm >= REALLY_STALLED_TIME) 
+    if (time_since_last_ppm >= REALLY_STALLED_TIME) 
     {
       radio_really_lost = TRUE;
     }
@@ -224,7 +224,7 @@ void check_failsafe_task(void)
 {
 	//vPrintString("S_9 check_failsafe_task start! \n\r"); //SunnyBeike
     //modified by wanbo
-    //if ((mode == MODE_MANUAL && !radio_ok) || (mode == MODE_AUTO && !mega128_ok)) 
+    if ((mode == MODE_MANUAL && !radio_ok) || (mode == MODE_AUTO && !mega128_ok)) 
     {
       servo_set(failsafe);
     }
@@ -234,7 +234,7 @@ void check_mega128_values_task(void)
 {
 	//vPrintString("S_8 check_mega128_values_task start! \n\r"); //SunnyBeike
 // modified by wanbo
-     //if ( !SpiIsSelected() && spi_was_interrupted ) 
+     if ( !SpiIsSelected() && spi_was_interrupted ) 
      {
          if (mega128_receive_valid)
          { 
@@ -244,7 +244,7 @@ void check_mega128_values_task(void)
                  servo_set(from_mega128.channels);
          }
      }
-     //if (time_since_last_mega128 == STALLED_TIME) 
+     if (time_since_last_mega128 == STALLED_TIME) 
      {
          mega128_ok = FALSE;
      }

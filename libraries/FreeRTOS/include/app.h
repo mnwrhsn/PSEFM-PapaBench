@@ -85,6 +85,7 @@ struct xRelationship
     struct sparseRelation xRelation[MAXRELATION];  // the number of effective relations among servant
 };
 
+void PapabenchInit();
 void s_0 (struct eventData *xLoopData) ;
 void s_1 (struct eventData *xLoopData) ;
 void s_2 (struct eventData *xLoopData) ;

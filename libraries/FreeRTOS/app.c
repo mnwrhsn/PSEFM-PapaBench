@@ -297,6 +297,36 @@ extern void  send_climb();
 extern void  send_mode();
 extern void  send_debug();
 extern void  send_nav_ref();
+extern void timer_init();
+extern void modem_init();
+extern void adc_init();
+extern void adc_buf_channel(uint8_t adc_channel, struct adc_buf* s);
+extern void spi_init();
+extern void link_fbw_init();
+extern void gps_init();
+extern void nav_init();
+extern void ir_init();
+extern void estimator_init();
+extern void fbw_init();
+
+void PapabenchInit()
+{
+    timer_init();
+    modem_init();
+    adc_init();
+#ifdef CTL_BRD_V1_1
+    adc_buf_channel(ADC_CHANNEL_BAT, &buf_bat);
+#endif
+    spi_init();
+    link_fbw_init();
+    gps_init();
+    nav_init();
+    ir_init();
+    estimator_init();
+#ifdef PAPABENCH_SINGLE
+    fbw_init();
+#endif
+}
 
 #define SUNNYBEIKE 1
 #ifdef SUNNYBEIKE

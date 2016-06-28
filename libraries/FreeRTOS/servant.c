@@ -187,7 +187,7 @@ void vSensor( void * pvParameter )
             vPrintNumber(xMyFlag);
             vPrintNumber(xTaskGetTickCount());
         
-            //xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
+            xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
             vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData );  // reuse event
         }
         xSemaphoreGive( xBinarySemaphore[0] );
@@ -238,7 +238,7 @@ void vServant( void * pvParameter )
             vPrintNumber(xMyFlag);
             vPrintNumber(xTaskGetTickCount());
         
-            //xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
+            xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
             vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData );
         }
         xSemaphoreGive( xBinarySemaphore[0] );
@@ -275,7 +275,7 @@ void vActuator( void * pvParameter )
             vPrintNumber(xMyFlag);
             vPrintNumber(xTaskGetTickCount());
         
-            //xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
+            xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
             vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData ); // update the information of output event 
         }
         xSemaphoreGive( xBinarySemaphore[0] );
@@ -290,14 +290,14 @@ void vR_Servant( void * pvParameter)
     {
         // waiting for events created by tick hook or S-Servant
         xSemaphoreTake( xBinarySemaphore[0], portMAX_DELAY );
-        vPrintString("Actuator\n\r");
+        //vPrintString("Actuator\n\r");
 
         // transit the events from events pool to nonexecutable event list
         // Copy one event to multiple when communication mode is 1 to N
-        vEventMap();
+        vEventScatter();
 
         // transit the events from nonexecutable event list to executable event list
-        vEventListTransit();
+        vEventTransit();
  
         // reduce multiple event for destination to one when communication mode is N to 1,
         // and transit the event from executable event pool to executable event list

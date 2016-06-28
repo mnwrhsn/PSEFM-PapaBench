@@ -384,7 +384,7 @@ xEventHandle pxEventGenericCreate( portBASE_TYPE pxSource, portTickType xDeadlin
 
 // An API to transfer all executable Event Items from xEventNonExecutableList to xEventExecutablePool.
 // function : transit the nonexecutable event to executable event, and update the inBoolCount of every event 
-void vEventListGenericTransit() 
+void vEventGenericTransit() 
 {
     xListItem * temp_pxEventListItem;
     struct tag xTag;
@@ -420,7 +420,7 @@ void vEventListGenericTransit()
     }
 }
 
-void vEventGenericMap()
+void vEventGenericScatter()
 {
     portBASE_TYPE i;
     portBASE_TYPE pxSource, outs;
@@ -428,8 +428,8 @@ void vEventGenericMap()
     eveECB * pxCopyEvent;
     xListItem * temp_pxEventListItem;
 
-    // event map
-    while(listCURRENT_LIST_LENGTH( &xEventNonExecutablePool ) > 0)
+    // event scatter
+   while(listCURRENT_LIST_LENGTH( &xEventNonExecutablePool ) > 0)
     {
         temp_pxEventListItem = (xListItem *) xEventNonExecutablePool.xListEnd.pxNext;    
         pxEvent = (eveECB *) temp_pxEventListItem->pvOwner;

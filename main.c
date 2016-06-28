@@ -49,11 +49,11 @@ int main(void)
     init_rs232();
     enable_rs232_interrupts();
     enable_rs232();
-
     vSemaphoreInitialise();
     vContextInit();
     vInitialiseEventLists();  
     vStartTask();
+    PapabenchInit();
     portBASE_TYPE i,j;
     portBASE_TYPE flag = 0;
 

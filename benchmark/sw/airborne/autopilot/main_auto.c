@@ -290,7 +290,7 @@ void send_boot(void){
   /** initialisation phase during boot */
   //vPrintString("S_13 reporting_task start!\n\r");
   //add by wanbo
-  //if (boot) 
+  if (boot) 
   {
       DOWNLINK_SEND_BOOT(&version);
       DOWNLINK_SEND_RAD_OF_IR(&estimator_ir, &estimator_rad, &estimator_rad_of_ir, &ir_roll_neutral, &ir_pitch_neutral);
@@ -299,7 +299,7 @@ void send_boot(void){
 }
 void send_attitude(void){ //499ms
     // add by wanbo
-  //if(!boot)
+  if(!boot)
   {
     count++;
     if (count == 250) count = 0;
@@ -309,35 +309,35 @@ void send_attitude(void){ //499ms
 }
   
 void send_adc(void){  //500ms
-  //if(!boot)
+  if(!boot)
   { if (count % 5 == 1) PERIODIC_SEND_ADC();}
 }
 void send_settings(void){ //500ms
-  //if(!boot)
+  if(!boot)
   {if (count % 5 == 2) PERIODIC_SEND_SETTINGS();}
 }
 void send_desired(void){  //1000ms
-  //if(!boot)
+  if(!boot)
   { if (count % 10 == 3) PERIODIC_SEND_DESIRED();}
 }
 void send_bat(void){  //2000ms
-  //if(!boot)
+  if(!boot)
   { if (count % 20 == 8) PERIODIC_SEND_BAT();}
 }
 void send_climb(void){  //2000ms
-  //if(!boot)
+  if(!boot)
   { if (count % 20 == 18) PERIODIC_SEND_CLIMB_PID();}
 }
 void send_mode(void){  //5000ms
-  //if(!boot)
+  if(!boot)
   { if (count % 50 == 9) PERIODIC_SEND_PPRZ_MODE();}
 }
 void send_debug(void){  //5000ms
-  //if(!boot)
+  if(!boot)
   { if (count % 50 == 29) PERIODIC_SEND_DEBUG();}
 }
 void send_nav_ref(void){  //10000ms
-  //if(!boot)
+  if(!boot)
   { if (count % 100 == 49) PERIODIC_SEND_NAVIGATION_REF();}
   //vPrintString("S_13 reporting_task end!\n\r");
 }
@@ -366,7 +366,7 @@ void radio_control_task( void ) {
       mode_changed = TRUE;
     }
     // modified by wanbo
-    //if (bit_is_set(from_fbw.status, AVERAGED_CHANNELS_SENT)) 
+    if (bit_is_set(from_fbw.status, AVERAGED_CHANNELS_SENT)) 
     {
       bool_t pprz_mode_changed = pprz_mode_update();
       mode_changed |= pprz_mode_changed;
