@@ -230,17 +230,28 @@ void vInitialiseEventLists()
 portBASE_TYPE xIsExecutableEventArrive()
 {
     xListItem * temp_pxEventListItem;
+    volatile xListItem * pxIterator;
     portTickType xCurrentTime;
+    portBASE_TYPE xLen, i;
     struct tag xTag;
     
-    if(listCURRENT_LIST_LENGTH(&xEventNonExecutableList) > 1)
+    if((xLen = listCURRENT_LIST_LENGTH(&xEventNonExecutablePool)) > 0)
     {
-        temp_pxEventListItem = (xListItem *)xEventNonExecutableList.xListEnd.pxNext;
-        xTag= xEventGetxTag( (xEventHandle) (temp_pxEventListItem)->pvOwner );
+
+        pxIterator = (xListItem *)&(xEventNonExecutablePool.xListEnd.pxNext);
         xCurrentTime = xTaskGetTickCount();
-        return xTag.xTimestamp <= xCurrentTime? pdTRUE : pdFALSE;
+        for( i = 0; i < xLen ; i++ , pxIterator = pxIterator->pxNext ) 
+        {
+            xTag = xEventGetxTag( pxIterator->pvOwner );
+            if(xTag.xTimestamp <= xCurrentTime) return pdTRUE;
+        }
+
+       // temp_pxEventListItem = (xListItem *) xEventNonExecutableList.xListEnd.pxNext;
+       // xTag = xEventGetxTag( (temp_pxEventListItem->pvOwner) );
+       // xCurrentTime = xTaskGetTickCount();
+       // return xTag.xTimestamp <= xCurrentTime ? pdTRUE : pdFALSE;
     }
-    return 0;
+    return pdFALSE;
 }
 
 /* unexecutable event comparison function is used in xEventList. 
