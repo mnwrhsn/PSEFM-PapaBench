@@ -296,9 +296,6 @@ void vR_Servant( void * pvParameter)
         // Copy one event to multiple when communication mode is 1 to N
         vEventScatter();
 
-        // transit the events from nonexecutable event list to executable event list
-        vEventTransit();
- 
         // reduce multiple event for destination to one when communication mode is N to 1,
         // and transit the event from executable event pool to executable event list
         vEventReduce(); 

@@ -37,7 +37,7 @@ void vStartTask()
     struct eventData null_data;
     for( i = 0; i < NUMBEROFTASK; ++i )
     {
-        pxEvent = pxEventCreate(xActuatorOfTask[i], xPeriodOfTask[i], xPeriodOfTask[i], null_data);
+        pxEvent = pxEventCreate(xActuatorOfTask[i], xPeriodOfTask[i], xPeriodOfTask[i], &null_data);
         vEventSend( pxEvent );   
     }
 }

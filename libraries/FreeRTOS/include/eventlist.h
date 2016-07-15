@@ -136,18 +136,8 @@ struct eventData xEventGetxData( xEventHandle pxEvent );
  * @param pxDestination is the destination where this event will be sent to./
  * @param pvData is the data that the event should bring along.
  * */
-xEventHandle pxEventGenericCreate( portBASE_TYPE pxSource, portTickType xDeadline, portTickType xTimestamp, struct eventData pvData);  
+xEventHandle pxEventGenericCreate( portBASE_TYPE pxSource, portTickType xDeadline, portTickType xTimestamp, struct eventData *pvData);  
 
-
-/*
- * transit the event from xEventList to specified xEventReadyList.
- *
- * @param pxEvent will record the event which is transited.
- * @param  pxList will record the target xEventReadyList where the pxEvent will be sent to.
- *
- * return: 1 transmit success; -1 no event; 0 not time yet
- * */
-void vEventGenericTransit(); 
 
 /*
  * servant receive event whose source is the pxSource and destination is current servant from specified xEventReadyList.
@@ -182,7 +172,6 @@ void vEventGenericUpdate( xEventHandle xEvent, portBASE_TYPE pxSource , portTick
 
 #define pxEventCreate( pxSource, xDeadline, xTimestamp, pvData)  pxEventGenericCreate(pxSource, xDeadline, xTimestamp, pvData)
 
-#define vEventTransit()     vEventGenericTransit()
 
 #define pxEventReceive()  pxEventGenericReceive()
 
