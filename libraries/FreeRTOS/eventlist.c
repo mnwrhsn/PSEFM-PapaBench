@@ -83,11 +83,19 @@ task.h is included from an application file. */
 
 #undef MPU_WRAPPERS_INCLUDED_FROM_API_FILE
 
+portTickType GCDPeriod;  // the GCD of period of all tasks
+portTickType xFutureModelTime ;
 extern struct context xContexts[NUMBEROFSERVANT];
 extern portTickType xPeriodOfTask[NUMBEROFTASK];
 
-portTickType GCDPeriod;  // the GCD of period of all tasks
-portTickType xFutureModelTime ;
+typedef struct eveReduceTrack
+{
+    xEventHandle pxEvent; // the pointer of event with latest timestamp and all data
+    portBASE_TYPE xNumOfEvent; // the number of events which are processed by reduce function at this time
+    portBASE_TYPE AllArrive; // bool type. Allarrive == 1 when xNumofEvent equals to the xNumOfIn of target servant
+}eveRT;
+
+eveRT xEventReduceTrack[NUMBEROFSERVANT];
 
 /* the struct of event item*/
 typedef struct eveEventControlBlock
@@ -112,7 +120,7 @@ PRIVILEGED_DATA static xList xEventReadyList;
 static void prvEventListGenericInsert( xListItem * pxNewListItem ) PRIVILEGED_FUNCTION;
 
 // <executable, deadline, timestamp, level>
-static portBASE_TYPE xCompareFunction( const struct tag t1, const struct tag t2 );
+static portBASE_TYPE xCompareFunction( const struct tag * t1, const struct tag * t2 );
 
 static void vEventSetxTag(portTickType xDeadline, portTickType xTimestamp, xEventHandle pxNewEvent );
 
@@ -121,12 +129,12 @@ static void vEventSetxTag(portTickType xDeadline, portTickType xTimestamp, xEven
 portBASE_TYPE xIsERLNull()
 {
     portBASE_TYPE pxDestination;
-    struct tag xTag;
+    struct tag * xTag;
     if(listCURRENT_LIST_LENGTH(&xEventReadyList) > 0)
     {
         pxDestination = xEventGetpxDestination((xEventReadyList.xListEnd.pxNext)->pvOwner); 
         xTag = xEventGetxTag(xEventReadyList.xListEnd.pxNext->pvOwner);
-        if( xTaskGetTickCount() >= xTag.xTimestamp )
+        if( xTaskGetTickCount() >= xTag->xTimestamp )
             return xContexts[pxDestination].xType; 
         else
             return 0;
@@ -144,14 +152,14 @@ portBASE_TYPE xEventGetpxDestination( xEventHandle pxEvent)
     return ((eveECB *) pxEvent)->pxDestination;
 }
 
-struct tag xEventGetxTag( xEventHandle pxEvent)
+struct tag * xEventGetxTag( xEventHandle pxEvent)
 {
-    return ((eveECB *) pxEvent)->xTag;
+    return &((eveECB *) pxEvent)->xTag;
 }
 
-struct eventData xEventGetxData( xEventHandle pxEvent)
+struct eventData * xEventGetxData( xEventHandle pxEvent)
 {
-    return ((eveECB *) pxEvent)->xData;
+    return &((eveECB *) pxEvent)->xData;
 }
 
 static portBASE_TYPE getGCD(portTickType t1, portTickType t2)
@@ -159,7 +167,7 @@ static portBASE_TYPE getGCD(portTickType t1, portTickType t2)
     return t1%t2==0 ? t2 : getGCD(t2, t1 % t2);
 }
 
-inline static portTickType GCDOfTaskPeriod()
+static portTickType GCDOfTaskPeriod()
 {
     portBASE_TYPE i;
     portTickType result = xPeriodOfTask[0];
@@ -203,7 +211,7 @@ portBASE_TYPE xIsExecutableEventArrive()
     volatile xListItem * pxIterator;
     portTickType xCurrentTime;
     portBASE_TYPE xLen, i;
-    struct tag xTag;
+    struct tag * xTag;
     
     if((xLen = listCURRENT_LIST_LENGTH(&xEventNonExecutablePool)) > 0)
     {
@@ -213,39 +221,34 @@ portBASE_TYPE xIsExecutableEventArrive()
         for( i = 0; i < xLen ; i++ ) 
         {
             xTag = xEventGetxTag( pxIterator->pvOwner );
-            if(xTag.xTimestamp <= xCurrentTime) return pdTRUE;
+            if(xTag->xTimestamp <= xCurrentTime) return pdTRUE;
             pxIterator = pxIterator->pxNext;
         }
-
-       // temp_pxEventListItem = (xListItem *) xEventNonExecutableList.xListEnd.pxNext;
-       // xTag = xEventGetxTag( (temp_pxEventListItem->pvOwner) );
-       // xCurrentTime = xTaskGetTickCount();
-       // return xTag.xTimestamp <= xCurrentTime ? pdTRUE : pdFALSE;
     }
     return pdFALSE;
 }
 
 /* executable event comparison function is used in xEventExecutableList. 
  * The event with earlist deadline will be scheduled to execute first */
-static portBASE_TYPE xCompareFunction( const struct tag t1, const struct tag t2 )
+static portBASE_TYPE xCompareFunction( const struct tag * t1, const struct tag * t2 )
 {
-    if( t1.xDeadline < t2.xDeadline)
+    if( t1->xDeadline < t2->xDeadline)
     {
         return pdTRUE;
     }
-    else if( t1.xDeadline == t2.xDeadline)
+    else if( t1->xDeadline == t2->xDeadline)
     {
-        if( t1.xTimestamp < t2.xTimestamp)
+        if( t1->xTimestamp < t2->xTimestamp)
         {
             return pdTRUE;
         }
-        else if( t1.xTimestamp == t2.xTimestamp )
+        else if( t1->xTimestamp == t2->xTimestamp )
         {
-            if( t1.xLevel < t2.xLevel )
+            if( t1->xLevel < t2->xLevel )
             {
                 return pdTRUE;
             }
-            else if( t1.xLevel == t2.xLevel && t1.xMicroStep < t2.xMicroStep )
+            else if( t1->xLevel == t2->xLevel && t1->xMicroStep < t2->xMicroStep )
             {
                 return pdTRUE;
             }
@@ -270,7 +273,7 @@ static void vEventSetxTag( portTickType xDeadline, portTickType xTimestamp, xEve
 /* insert event to xEventNonExecutableList in terms of comparison function 1 */
 static void prvEventListGenericInsert( xListItem *pxNewListItem )
 {
-    struct tag xTagOfInsertion;
+    struct tag * xTagOfInsertion;
     xList * pxList = &xEventExecutableList; 
     volatile xListItem *pxIterator = (xListItem *)&(pxList->xListEnd);
     portBASE_TYPE xLen, i;
@@ -326,7 +329,7 @@ void vEventGenericScatter()
 {
     portBASE_TYPE i, j, xLen;
     portBASE_TYPE pxSource, pxDestination, outs;
-    struct tag xTag;
+    struct tag * xTag;
     eveECB * pxEvent , * pxCopyEvent; 
     xListItem * temp_pxEventListItem;
     portTickType xCurrentTime;
@@ -341,7 +344,7 @@ void vEventGenericScatter()
         {
             xTag = xEventGetxTag( pxIterator->pvOwner ); 
             // find one
-            if( xTag.xTimestamp <= xCurrentTime )
+            if( xTag->xTimestamp <= xCurrentTime )
             {
                 pxEvent = (eveECB *) pxIterator->pvOwner;
                 outs = xContexts[ pxEvent->pxSource ].xNumOfOut; // used for cloning
@@ -377,6 +380,7 @@ void vEventGenericScatter()
     }
 }
 
+/*
 void vEventGenericReduce()
 {
     xListItem * reduce_pxEventListItem, * temp_pxEventListItem;
@@ -447,7 +451,89 @@ void vEventGenericReduce()
         }
     }
 }
+*/
 
+static void clearEventReduceTrack()
+{
+    portBASE_TYPE i = NUMBEROFSERVANT;
+    while(i--)
+    {
+        xEventReduceTrack[i].pxEvent = NULL; 
+        xEventReduceTrack[i].xNumOfEvent = xEventReduceTrack[i].AllArrive = 0;
+    }
+}
+
+void vEventGenericReduce()
+{
+    xListItem * temp_pxEventListItem; 
+    portBASE_TYPE i, temp_count, xLen, pxDestination;
+    struct tag * temp_tag;
+    struct eventData * temp_data;
+    volatile xListItem * pxIterator;
+    eveRT * temp_RT;
+
+    if( (xLen = listCURRENT_LIST_LENGTH( &xEventExecutablePool )) > 0 )
+    {
+        clearEventReduceTrack();
+        pxIterator = (xListItem *) xEventExecutablePool.xListEnd.pxNext;
+        for( i = 0; i < xLen; i++)
+        {
+            pxDestination = xEventGetpxDestination( pxIterator->pvOwner );
+            if(xContexts[pxDestination].xInBoolCount == xContexts[pxDestination].xNumOfIn )
+            {
+                temp_RT = &xEventReduceTrack[pxDestination];
+                if(xContexts[pxDestination].xInBoolCount > 1)
+                {
+                    if( (temp_count = temp_RT->xNumOfEvent) > 0 )
+                    {
+                        temp_data = xEventGetxData( pxIterator->pvOwner );  
+                        temp_tag = xEventGetxTag( pxIterator->pvOwner );
+                        ((eveECB *)temp_RT->pxEvent)->xData.xDataArray[temp_count] = temp_data->xDataArray[0];
+
+                        if( temp_RT->xNumOfEvent++ == xContexts[pxDestination].xInBoolCount - 1)
+                        {
+                            temp_RT->AllArrive = 1;
+                        }
+                        if(((eveECB *)temp_RT->pxEvent)->xTag.xTimestamp < temp_tag->xTimestamp)
+                        {
+                            ((eveECB *)temp_RT->pxEvent)->xTag.xTimestamp = temp_tag->xTimestamp;
+                        }
+
+                        temp_pxEventListItem = (xListItem *) pxIterator;
+                        pxIterator = pxIterator->pxNext;
+                        vEventGenericDelete(temp_pxEventListItem->pvOwner);  // delete the redundant events
+                    }
+                    else  // the fist one of reduce event
+                    {
+                        temp_RT->pxEvent = pxIterator->pvOwner; 
+                        temp_RT->xNumOfEvent = 1;
+                        
+                        temp_pxEventListItem = (xListItem *) pxIterator;
+                        pxIterator = pxIterator->pxNext;
+                        vListRemove(temp_pxEventListItem);
+                    }
+                }
+                else // only one event for the target servant
+                {
+                    temp_RT->pxEvent = pxIterator->pvOwner; 
+                    temp_RT->xNumOfEvent = 1;
+                    temp_RT->AllArrive = 1;
+                 
+                    temp_pxEventListItem = (xListItem *) pxIterator;
+                    pxIterator = pxIterator->pxNext;
+                    vListRemove(temp_pxEventListItem);
+                }
+            }
+        } // end for
+        for(i=0; i<NUMBEROFSERVANT; ++i)
+        {
+            if(xEventReduceTrack[i].AllArrive)
+            {
+                prvEventListGenericInsert(&((eveECB *)xEventReduceTrack[i].pxEvent)->xEventListItem);
+            }
+        } // end for
+    } // end if
+}
 
 
 static portBASE_TYPE pOverLap( xListItem * pxEventListItem)
@@ -492,16 +578,16 @@ static void xSetTimestamp( xListItem * pxEventListItem)
     }
 }
 
-inline static portBASE_TYPE pEqualxDeadline(struct tag xTag1, struct tag xTag2)
+static portBASE_TYPE pEqualxDeadline(struct tag * xTag1, struct tag * xTag2)
 {
-    return (xTag1.xDeadline == xTag2.xDeadline);
+    return (xTag1->xDeadline == xTag2->xDeadline);
 }
 
 // update the timestamp of event in xEventExecutableList in terms of xFutureModelTime
 portBASE_TYPE xEventGenericSerialize()
 {
     xListItem * flag_pxEventListItem;
-    struct tag origin_tag;
+    struct tag * origin_tag;
     portBASE_TYPE count = 1;
 
     if( listCURRENT_LIST_LENGTH( &xEventExecutableList ) > 0 )
@@ -562,14 +648,14 @@ xEventHandle pxEventGenericReceive()
     return (xEventHandle) pxEventList->pvOwner;
 }
 
-void vEventGenericUpdate( xEventHandle xEvent, portBASE_TYPE pxSource, portTickType xDeadline, portTickType xTimestamp, struct eventData xData)
+void vEventGenericUpdate( xEventHandle xEvent, portBASE_TYPE pxSource, portTickType xDeadline, portTickType xTimestamp, struct eventData * xData)
 {
     eveECB * pxEvent = (eveECB *)xEvent;
     pxEvent->pxSource = pxSource;
     pxEvent->xTag.xDeadline = xDeadline;
     pxEvent->xTag.xTimestamp = xTimestamp; 
     pxEvent->xTag.xMicroStep = 0;
-    pxEvent->xData = xData;
+    pxEvent->xData = *xData;
 }
 
 void vEventGenericDelete( xEventHandle xEvent)

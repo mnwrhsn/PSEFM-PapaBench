@@ -164,8 +164,8 @@ void vSensor( void * pvParameter )
     portBASE_TYPE xMyFlag;
     portTickType xPeriod;
     portTickType xTimestamp;
-    struct eventData xMyData;
-    struct tag xMyTag;
+    struct eventData * xMyData;
+    struct tag * xMyTag;
     portBASE_TYPE boolFlag;
 
     while(1)
@@ -182,12 +182,12 @@ void vSensor( void * pvParameter )
             xMyTag = xEventGetxTag( pxEvent );
             xPeriod= xContexts[xMyFlag].xPeriod;
             xContexts[xMyFlag].xCount ++;
-            xTimestamp = xMyTag.xTimestamp + INPUT;   
+            xTimestamp = xMyTag->xTimestamp + INPUT;   
             xFutureModelTime = xTimestamp;  // init the future model time to the start of LET execution duration.
             vPrintNumber(xMyFlag);
             vPrintNumber(xTaskGetTickCount());
         
-            xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
+            xContexts[xMyFlag].xFp( xMyData );  // get the loop data and sensor data
             vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData );  // reuse event
         }
         xSemaphoreGive( xBinarySemaphore[0] );
@@ -201,8 +201,8 @@ void vServant( void * pvParameter )
     portBASE_TYPE pxDestination;
     portTickType xPeriod;
     portTickType xTimestamp;
-    struct eventData xMyData;
-    struct tag xMyTag;
+    struct eventData * xMyData;
+    struct tag * xMyTag;
     portBASE_TYPE boolFlag;
     while(1)
     {
@@ -225,7 +225,7 @@ void vServant( void * pvParameter )
             switch(xContexts[pxDestination].xType)
             {
                 case 2:
-                    xTimestamp = xMyTag.xTimestamp + xContexts[xMyFlag].xLet;
+                    xTimestamp = xMyTag->xTimestamp + xContexts[xMyFlag].xLet;
                     break;
                 case 3:
                     // the output execution time start from 3ms before end of the task period
@@ -238,7 +238,7 @@ void vServant( void * pvParameter )
             vPrintNumber(xMyFlag);
             vPrintNumber(xTaskGetTickCount());
         
-            xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
+            xContexts[xMyFlag].xFp( xMyData );  // get the loop data and sensor data
             vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData );
         }
         xSemaphoreGive( xBinarySemaphore[0] );
@@ -252,8 +252,8 @@ void vActuator( void * pvParameter )
     portBASE_TYPE xMyFlag;
     portTickType xPeriod;
     portTickType xTimestamp;
-    struct eventData xMyData;
-    struct tag xMyTag;
+    struct eventData * xMyData;
+    struct tag * xMyTag;
     portBASE_TYPE boolFlag;
 
     while(1)
@@ -271,11 +271,11 @@ void vActuator( void * pvParameter )
             xMyTag = xEventGetxTag( pxEvent );
             xPeriod = xContexts[xMyFlag].xPeriod;
             xContexts[xMyFlag].xCount ++;
-            xTimestamp = xMyTag.xTimestamp + OUTPUT;  // all sensor are scheduled to execute start from 0 to 4 ms of every period
+            xTimestamp = xMyTag->xTimestamp + OUTPUT;  // all sensor are scheduled to execute start from 0 to 4 ms of every period
             vPrintNumber(xMyFlag);
             vPrintNumber(xTaskGetTickCount());
         
-            xContexts[xMyFlag].xFp( &xMyData );  // get the loop data and sensor data
+            xContexts[xMyFlag].xFp( xMyData );  // get the loop data and sensor data
             vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData ); // update the information of output event 
         }
         xSemaphoreGive( xBinarySemaphore[0] );

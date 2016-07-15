@@ -120,7 +120,7 @@ portBASE_TYPE  xEventGetpxDestination( xEventHandle pxEvent );
  * @return the timestamp of this event item as struct timeStamp.
  * */
 
-struct tag xEventGetxTag( xEventHandle pxEvent );
+struct tag * xEventGetxTag( xEventHandle pxEvent );
 
 /*
  * get the data of specified event.
@@ -128,7 +128,7 @@ struct tag xEventGetxTag( xEventHandle pxEvent );
  * @param pxEvent is the target event item
  * @return the data which is struct eventData
  * */
-struct eventData xEventGetxData( xEventHandle pxEvent );
+struct eventData * xEventGetxData( xEventHandle pxEvent );
 
 /*
  * create a new event item.
@@ -167,7 +167,7 @@ void vEventGenericReduce();  // reduce the mutiple event for the same destinatio
 portBASE_TYPE xEventGenericSerialize(); // serialize the timestamp of simultaneous events
                                         // and update other events who are affected by serialisation
 
-void vEventGenericUpdate( xEventHandle xEvent, portBASE_TYPE pxSource , portTickType xDeadline, portTickType xTimestamp, struct eventData xData );
+void vEventGenericUpdate( xEventHandle xEvent, portBASE_TYPE pxSource , portTickType xDeadline, portTickType xTimestamp, struct eventData * xData );
 
 
 #define pxEventCreate( pxSource, xDeadline, xTimestamp, pvData)  pxEventGenericCreate(pxSource, xDeadline, xTimestamp, pvData)
