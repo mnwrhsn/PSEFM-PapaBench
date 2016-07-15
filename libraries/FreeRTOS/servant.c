@@ -304,21 +304,23 @@ void vR_Servant( void * pvParameter)
         // and transit the ready events to ready list
         // return the pxDestination of the first ready event in ready list
         pxDestination = xEventSerialize(); 
-
-        switch(xContexts[pxDestination].xType)
+        if(pxDestination != -1)
         {
-            case 1:
-                xSemaphoreGive( xBinarySemaphore[1] );
-                break;
-            case 2:
-                xSemaphoreGive( xBinarySemaphore[2] );
-                break;
-            case 3:
-                xSemaphoreGive( xBinarySemaphore[3] );
-                break;
-            default:
-                break;
-                // no event available 
+            switch(xContexts[pxDestination].xType)
+            {
+                case 1:
+                    xSemaphoreGive( xBinarySemaphore[1] );
+                    break;
+                case 2:
+                    xSemaphoreGive( xBinarySemaphore[2] );
+                    break;
+                case 3:
+                    xSemaphoreGive( xBinarySemaphore[3] );
+                    break;
+                default:
+                    break;
+                    // no event available 
+            }
         }
     }
 }

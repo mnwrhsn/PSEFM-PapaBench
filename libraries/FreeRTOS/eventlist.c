@@ -154,12 +154,12 @@ portBASE_TYPE xEventGetpxDestination( xEventHandle pxEvent)
 
 struct tag * xEventGetxTag( xEventHandle pxEvent)
 {
-    return &((eveECB *) pxEvent)->xTag;
+    return (struct tag *)&((eveECB *) pxEvent)->xTag;
 }
 
 struct eventData * xEventGetxData( xEventHandle pxEvent)
 {
-    return &((eveECB *) pxEvent)->xData;
+    return (struct eventData *)&((eveECB *) pxEvent)->xData;
 }
 
 static portBASE_TYPE getGCD(portTickType t1, portTickType t2)
@@ -275,7 +275,7 @@ static void prvEventListGenericInsert( xListItem *pxNewListItem )
 {
     struct tag * xTagOfInsertion;
     xList * pxList = &xEventExecutableList; 
-    volatile xListItem *pxIterator = (xListItem *)&(pxList->xListEnd);
+    volatile xListItem *pxIterator;
     portBASE_TYPE xLen, i;
 
     xTagOfInsertion = xEventGetxTag(pxNewListItem->pvOwner);
@@ -283,13 +283,17 @@ static void prvEventListGenericInsert( xListItem *pxNewListItem )
     taskENTER_CRITICAL();
     // inserting start from the ending of list
     xLen = listCURRENT_LIST_LENGTH(&xEventExecutableList);
-    for( i = 0; 
-         i < xLen && xCompareFunction( xTagOfInsertion, xEventGetxTag( pxIterator->pxPrevious->pvOwner ));
-         i ++, pxIterator = pxIterator->pxPrevious) {}
+    pxIterator = (xListItem *)&(pxList->xListEnd);
+    for( i = 0; i < xLen && xCompareFunction( xTagOfInsertion, xEventGetxTag( pxIterator->pxPrevious->pvOwner )); i ++)
+    { 
+        pxIterator = pxIterator->pxPrevious;
+    } 
+    //vPrintString("hello,world\n\r");
 
     taskEXIT_CRITICAL();
 
-    //pxIterator = pxIterator->pxPrevious;
+    pxIterator = pxIterator->pxPrevious;
+    
     // insert the new event after a smaller one from the back of list
     pxNewListItem->pxNext = pxIterator->pxNext;
     pxNewListItem->pxNext->pxPrevious = ( volatile xListItem * ) pxNewListItem;
@@ -523,6 +527,7 @@ void vEventGenericReduce()
                     pxIterator = pxIterator->pxNext;
                     vListRemove(temp_pxEventListItem);
                 }
+
             }
         } // end for
         for(i=0; i<NUMBEROFSERVANT; ++i)
@@ -530,6 +535,7 @@ void vEventGenericReduce()
             if(xEventReduceTrack[i].AllArrive)
             {
                 prvEventListGenericInsert(&((eveECB *)xEventReduceTrack[i].pxEvent)->xEventListItem);
+                xContexts[i].xInBoolCount = 0;  // important recovery !!!!!
             }
         } // end for
     } // end if
