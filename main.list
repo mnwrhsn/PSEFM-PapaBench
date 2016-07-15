@@ -8128,9 +8128,7 @@ void vEventGenericScatter()
     2f02:	bd80      	pop	{r7, pc}
 
 00002f04 <clearEventReduceTrack>:
-    }
-}
-*/
+
 
 static void clearEventReduceTrack()
 {
@@ -8186,7 +8184,7 @@ static void clearEventReduceTrack()
     2f6c:	4413      	add	r3, r2
     2f6e:	3304      	adds	r3, #4
     2f70:	6018      	str	r0, [r3, #0]
-*/
+
 
 static void clearEventReduceTrack()
 {
@@ -8481,7 +8479,7 @@ void vEventGenericReduce()
     3148:	3320      	adds	r3, #32
     314a:	4618      	mov	r0, r3
     314c:	f7ff fd78 	bl	2c40 <prvEventListGenericInsert>
-                xContexts[i].xInBoolCount = 0;
+                xContexts[i].xInBoolCount = 0;  // important recovery !!!!!
     3150:	f640 120c 	movw	r2, #2316	; 0x90c
     3154:	f2c2 0200 	movt	r2, #8192	; 0x2000
     3158:	6a79      	ldr	r1, [r7, #36]	; 0x24
@@ -8506,7 +8504,7 @@ void vEventGenericReduce()
     3172:	2b2e      	cmp	r3, #46	; 0x2e
     3174:	ddcf      	ble.n	3116 <vEventGenericReduce+0x18e>
                 prvEventListGenericInsert(&((eveECB *)xEventReduceTrack[i].pxEvent)->xEventListItem);
-                xContexts[i].xInBoolCount = 0;
+                xContexts[i].xInBoolCount = 0;  // important recovery !!!!!
             }
         } // end for
     } // end if
