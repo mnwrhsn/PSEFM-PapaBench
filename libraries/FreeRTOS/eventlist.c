@@ -244,11 +244,11 @@ static portBASE_TYPE xCompareFunction( const struct tag * t1, const struct tag *
         }
         else if( t1->xTimestamp == t2->xTimestamp )
         {
-            if( t1->xLevel < t2->xLevel )
+            if( t1->xMicroStep < t2->xMicroStep)
             {
                 return pdTRUE;
             }
-            else if( t1->xLevel == t2->xLevel && t1->xMicroStep < t2->xMicroStep )
+            else if(t1->xMicroStep == t2->xMicroStep && t1->xLevel < t2->xLevel )
             {
                 return pdTRUE;
             }
@@ -360,7 +360,7 @@ void vEventGenericScatter()
                 // complete the information of the origin event.
                 pxEvent->pxDestination = xContexts[pxEvent->pxSource].xOutFlag[0];
                 xContexts[pxEvent->pxDestination].xInBoolCount++;
-                pxEvent->xTag.xLevel = xContexts[pxEvent->pxSource].xTaskId;
+                pxEvent->xTag.xLevel = xContexts[pxEvent->pxDestination].xMyFlag;
                 vListInsertEnd(&xEventExecutablePool, temp_pxEventListItem);
 
                 // copy one event to multiples
@@ -369,9 +369,10 @@ void vEventGenericScatter()
                     pxCopyEvent = (eveECB *)pxEventGenericCreate(pxSource, pxEvent->xTag.xDeadline, pxEvent->xTag.xTimestamp, &pxEvent->xData);
                     // complete the information of the copied event.
                     pxCopyEvent->xTag.xMicroStep = i;
-                    pxCopyEvent->xTag.xLevel = pxEvent->xTag.xLevel;   // copy events have all the same xLevel
+
                     pxCopyEvent->pxDestination = xContexts[pxEvent->pxSource].xOutFlag[i];
                     xContexts[pxCopyEvent->pxDestination].xInBoolCount++;
+                    pxCopyEvent->xTag.xLevel = xContexts[pxEvent->pxDestination].xMyFlag; 
                     vListInsertEnd(&xEventExecutablePool, &pxCopyEvent->xEventListItem);
                 }
                 taskEXIT_CRITICAL();

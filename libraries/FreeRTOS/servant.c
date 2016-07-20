@@ -162,7 +162,7 @@ void vSensor( void * pvParameter )
 {
     xEventHandle pxEvent;
     portBASE_TYPE xMyFlag;
-    portTickType xPeriod;
+    portTickType xDeadline;
     portTickType xTimestamp;
     struct eventData * xMyData;
     struct tag * xMyTag;
@@ -180,15 +180,15 @@ void vSensor( void * pvParameter )
             xMyFlag = xEventGetpxDestination( pxEvent );
             xMyData = xEventGetxData( pxEvent );
             xMyTag = xEventGetxTag( pxEvent );
-            xPeriod= xContexts[xMyFlag].xPeriod;
             xContexts[xMyFlag].xCount ++;
+            xDeadline= xContexts[xMyFlag].xPeriod * xContexts[xMyFlag].xCount;
             xTimestamp = xMyTag->xTimestamp + INPUT;   
             xFutureModelTime = xTimestamp;  // init the future model time to the start of LET execution duration.
             vPrintNumber(xMyFlag);
             vPrintNumber(xTaskGetTickCount());
         
             xContexts[xMyFlag].xFp( xMyData );  // get the loop data and sensor data
-            vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData );  // reuse event
+            vEventUpdate( pxEvent, xMyFlag, xDeadline, xTimestamp, xMyData );  // reuse event
         }
         xSemaphoreGive( xBinarySemaphore[0] );
     }
@@ -199,7 +199,7 @@ void vServant( void * pvParameter )
     xEventHandle pxEvent;
     portBASE_TYPE xMyFlag;
     portBASE_TYPE pxDestination;
-    portTickType xPeriod;
+    portTickType xDeadline;
     portTickType xTimestamp;
     struct eventData * xMyData;
     struct tag * xMyTag;
@@ -216,8 +216,8 @@ void vServant( void * pvParameter )
             xMyFlag = xEventGetpxDestination( pxEvent );
             xMyData = xEventGetxData( pxEvent );
             xMyTag = xEventGetxTag( pxEvent );
-            xPeriod= xContexts[xMyFlag].xPeriod;
             xContexts[xMyFlag].xCount ++;
+            xDeadline = xContexts[xMyFlag].xPeriod * xContexts[xMyFlag].xCount;
             // set the timestamp of event in terms of destination servant
             // if destination is actuator, then set as the EndOfLET
             // else set as the sum of input event's timestamp and let
@@ -229,7 +229,7 @@ void vServant( void * pvParameter )
                     break;
                 case 3:
                     // the output execution time start from 3ms before end of the task period
-                    xTimestamp = xPeriod * xContexts[xMyFlag].xCount - OUTPUT; 
+                    xTimestamp = xDeadline - OUTPUT; 
                     break;
                 default:
                     break;
@@ -239,7 +239,7 @@ void vServant( void * pvParameter )
             vPrintNumber(xTaskGetTickCount());
         
             xContexts[xMyFlag].xFp( xMyData );  // get the loop data and sensor data
-            vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData );
+            vEventUpdate( pxEvent, xMyFlag, xDeadline, xTimestamp, xMyData );
         }
         xSemaphoreGive( xBinarySemaphore[0] );
     }
@@ -250,7 +250,7 @@ void vActuator( void * pvParameter )
 {
     xEventHandle pxEvent;
     portBASE_TYPE xMyFlag;
-    portTickType xPeriod;
+    portTickType xDeadline;
     portTickType xTimestamp;
     struct eventData * xMyData;
     struct tag * xMyTag;
@@ -269,14 +269,14 @@ void vActuator( void * pvParameter )
             xMyFlag = xEventGetpxDestination( pxEvent );
             xMyData = xEventGetxData( pxEvent );
             xMyTag = xEventGetxTag( pxEvent );
-            xPeriod = xContexts[xMyFlag].xPeriod;
             xContexts[xMyFlag].xCount ++;
+            xDeadline = xContexts[xMyFlag].xPeriod * xContexts[xMyFlag].xCount;
             xTimestamp = xMyTag->xTimestamp + OUTPUT;  // all sensor are scheduled to execute start from 0 to 4 ms of every period
             vPrintNumber(xMyFlag);
             vPrintNumber(xTaskGetTickCount());
         
             xContexts[xMyFlag].xFp( xMyData );  // get the loop data and sensor data
-            vEventUpdate( pxEvent, xMyFlag, xPeriod, xTimestamp, xMyData ); // update the information of output event 
+            vEventUpdate( pxEvent, xMyFlag, xDeadline, xTimestamp, xMyData ); // update the information of output event 
         }
         xSemaphoreGive( xBinarySemaphore[0] );
     }
@@ -290,7 +290,7 @@ void vR_Servant( void * pvParameter)
     {
         // waiting for events created by tick hook or S-Servant
         xSemaphoreTake( xBinarySemaphore[0], portMAX_DELAY );
-        vPrintString("Actuator\n\r");
+        //vPrintString("Actuator\n\r");
 
         // transit the events from events pool to nonexecutable event list
         // Copy one event to multiple when communication mode is 1 to N
