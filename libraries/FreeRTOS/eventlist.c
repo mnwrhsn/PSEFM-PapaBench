@@ -487,30 +487,32 @@ static portBASE_TYPE pOverLap( xListItem * pxEventListItem)
     return 0;
 }
 
-static void xSetTimestamp( xListItem * pxEventListItem)
+static void vSetTimestamp( xListItem * pxEventListItem)
 {
-    portBASE_TYPE i;
+    portBASE_TYPE i, flag;
+    portTickType nextComputingStart;
     eveECB *pxEvent;  
     
     pxEvent = (eveECB *) pxEventListItem->pvOwner;
-    pxEvent->xTag.xTimestamp = xFutureModelTime;
+    pxEvent->xTag.xTimestamp = xFutureModelTime;// update model time
+    nextComputingStart = (xFutureModelTime/GCDPeriod) * GCDPeriod + GCDPeriod + INPUT;
+    flag = pOverLap(pxEventListItem);
 
-    if( pOverLap(pxEventListItem )== 0 ) // not overlaped
+    if( !flag  && xFutureModelTime < nextComputingStart) // not overlaped
     {
-        xFutureModelTime += xContexts[pxEvent->pxDestination].xLet; // update future model time
         vListRemove( pxEventListItem); 
         vListInsertEnd(&xEventReadyList, pxEventListItem);
     }
-    else  // overlaped
+    else if ( flag && xFutureModelTime < nextComputingStart ) 
     {
         // set the future model time to start time of next LET
-        xFutureModelTime = (xFutureModelTime/GCDPeriod) * GCDPeriod + GCDPeriod + INPUT;  
+        xFutureModelTime = nextComputingStart; 
         pxEvent->xTag.xTimestamp = xFutureModelTime;
-        xFutureModelTime += xContexts[pxEvent->pxDestination].xLet;
 
         vListRemove( pxEventListItem); 
         vListInsertEnd(&xEventNonExecutablePool, pxEventListItem);
     }
+    xFutureModelTime += xContexts[pxEvent->pxDestination].xLet;  
 }
 
 static portBASE_TYPE pEqualxDeadline(struct tag * xTag1, struct tag * xTag2)
@@ -543,7 +545,7 @@ portBASE_TYPE xEventGenericSerialize()
                 // update the timestamp of event
                 // if overlaped, then remove the event to xEventNonExecutablePool
                 // else, remove the event to xEvenReadyList
-                xSetTimestamp( flag_pxEventListItem);
+                vSetTimestamp( flag_pxEventListItem);
             }
             else
             {
