@@ -50,11 +50,12 @@ void vEventInterrupt(void * pvParameters)
     xSemaphoreTake(xInterruptSemaphore, portMAX_DELAY);
     while(1)
     {
-        xSemaphoreTake(xInterruptSemaphore, portMAX_DELAY);
+        //xSemaphoreTake(xInterruptSemaphore, portMAX_DELAY);
         if(xIsExecutableEventArrive())
         {
             xSemaphoreGive( xBinarySemaphore[0] );
         }
+        taskYIELD();
     }
 }
 
@@ -73,10 +74,10 @@ int main(void)
     portBASE_TYPE i,j;
     portBASE_TYPE flag = 0;
 
-    xTaskCreate( vR_Servant, "R-Servant", SERVANT_STACK_SIZE, NULL,tskIDLE_PRIORITY + 1, &xTaskOfHandle[0]);
-    xTaskCreate( vSensor, "I-Servant", SERVANT_STACK_SIZE, NULL,tskIDLE_PRIORITY + 1, &xTaskOfHandle[1]);
-    xTaskCreate( vServant, "C-Servant", SERVANT_STACK_SIZE, NULL,tskIDLE_PRIORITY + 1, &xTaskOfHandle[2]);
-    xTaskCreate( vActuator, "O-Servant", SERVANT_STACK_SIZE, NULL,tskIDLE_PRIORITY + 1, &xTaskOfHandle[3]);
+    xTaskCreate( vR_Servant, "R-Servant", SERVANT_STACK_SIZE, NULL,tskIDLE_PRIORITY + 2, &xTaskOfHandle[0]);
+    xTaskCreate( vSensor, "I-Servant", SERVANT_STACK_SIZE, NULL,tskIDLE_PRIORITY + 2, &xTaskOfHandle[1]);
+    xTaskCreate( vServant, "C-Servant", SERVANT_STACK_SIZE, NULL,tskIDLE_PRIORITY + 2, &xTaskOfHandle[2]);
+    xTaskCreate( vActuator, "O-Servant", SERVANT_STACK_SIZE, NULL,tskIDLE_PRIORITY + 2, &xTaskOfHandle[3]);
     xTaskCreate( vEventInterrupt, "event", SERVANT_STACK_SIZE, NULL, tskIDLE_PRIORITY+1, NULL );
 
     xSemaphoreGive(xBinarySemaphore[0]);
@@ -100,5 +101,5 @@ void myTraceSwitchedOut	(){
  * */
 void vApplicationTickHook( void )
 {
-    xSemaphoreGive( xInterruptSemaphore );
+    //xSemaphoreGive( xInterruptSemaphore );
 }

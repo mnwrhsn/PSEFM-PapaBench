@@ -1486,7 +1486,7 @@ tskTCB * pxTCB;
 		}
 
 		/* See if this tick has made a timeout expire. */
-		prvCheckDelayedTasks();
+		//prvCheckDelayedTasks();
 	}
 	else
 	{
