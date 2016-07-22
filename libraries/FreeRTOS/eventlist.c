@@ -512,6 +512,11 @@ static void vSetTimestamp( xListItem * pxEventListItem)
         vListRemove( pxEventListItem); 
         vListInsertEnd(&xEventNonExecutablePool, pxEventListItem);
     }
+    else
+    {
+        vListRemove( pxEventListItem); 
+        vListInsertEnd(&xEventNonExecutablePool, pxEventListItem);
+    }
     xFutureModelTime += xContexts[pxEvent->pxDestination].xLet;  
 }
 
