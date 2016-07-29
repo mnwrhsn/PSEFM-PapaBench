@@ -39,7 +39,8 @@ void vStartTask()
 
     for( i = 0; i < NUMBEROFTASK; ++i )
     {
-        pxEvent = pxEventCreate(xActuatorOfTask[i], xPeriodOfTask[i], xPeriodOfTask[i], &null_data);
+        // set the deadline of task as the second deadline of task period
+        pxEvent = pxEventCreate(xActuatorOfTask[i], xPeriodOfTask[i]*2, xPeriodOfTask[i], &null_data);
         vEventSend( pxEvent );   
     }
 }

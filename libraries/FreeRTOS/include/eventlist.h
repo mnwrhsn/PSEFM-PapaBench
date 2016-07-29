@@ -110,6 +110,8 @@ portBASE_TYPE xIsERLNull();
 
 portBASE_TYPE xIsExecutableEventArrive();
 
+portTickType xEventGetxDeadline( xEventHandle pxEvent );
+
 portBASE_TYPE xEventGetpxSource( xEventHandle pxEvent );
 
 portBASE_TYPE  xEventGetpxDestination( xEventHandle pxEvent );

@@ -142,6 +142,11 @@ portBASE_TYPE xIsERLNull()
     return -1;
 }
 
+portTickType xEventGetxDeadline( xEventHandle pxEvent )
+{
+    return ((eveECB *)pxEvent)->xTag.xDeadline;
+}
+
 portBASE_TYPE xEventGetpxSource( xEventHandle pxEvent )
 {
     return ((eveECB *)pxEvent)->pxSource;
@@ -360,6 +365,7 @@ void vEventGenericScatter()
                 // complete the information of the origin event.
                 pxEvent->pxDestination = xContexts[pxEvent->pxSource].xOutFlag[0];
                 xContexts[pxEvent->pxDestination].xInBoolCount++;
+                pxEvent->xTag.xMicroStep = 0;
                 pxEvent->xTag.xLevel = xContexts[pxEvent->pxDestination].xMyFlag;
                 vListInsertEnd(&xEventExecutablePool, temp_pxEventListItem);
 
@@ -425,7 +431,7 @@ void vEventGenericReduce()
 
                         if( temp_RT->xNumOfEvent++ == xContexts[pxDestination].xInBoolCount - 1)
                         {
-                            temp_RT->AllArrive = 1;
+                            temp_RT->AllArrive = 1;  // all events are found
                         }
                         if(((eveECB *)temp_RT->pxEvent)->xTag.xTimestamp < temp_tag->xTimestamp)
                         {
