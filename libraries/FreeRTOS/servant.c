@@ -225,7 +225,8 @@ void vServant( void * pvParameter )
             switch(xContexts[pxDestination].xType)
             {
                 case 2:
-                    xTimestamp = xMyTag->xTimestamp + xContexts[xMyFlag].xLet;
+                    //xTimestamp = xMyTag->xTimestamp + xContexts[xMyFlag].xLet;
+                    xTimestamp = xTaskGetTickCount();
                     break;
                 case 3:
                     // the output execution time start from 3ms before end of the task period
