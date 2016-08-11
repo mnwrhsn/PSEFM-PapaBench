@@ -179,6 +179,8 @@ static portTickType GCDOfTaskPeriod()
 
     for( i = 1; i < NUMBEROFTASK; ++ i )
     {
+        if( i==0 || i==1 || i==5 )
+            continue;
         result = getGCD(result , xPeriodOfTask[i]); 
     }
     return result;
@@ -483,14 +485,17 @@ static portBASE_TYPE pOverLap( xListItem * pxEventListItem)
     portBASE_TYPE pxDestination = pxEvent->pxDestination; 
     portTickType start = pxEvent->xTag.xTimestamp;
     portTickType end   = start + xContexts[pxDestination].xLet;
+    portTickType deadline = (xTaskGetTickCount()/GCDPeriod + 1)*GCDPeriod;
 
     // different execution time overlaped
-    if( start % GCDPeriod < INPUT || start % GCDPeriod > (GCDPeriod - OUTPUT) || 
-            end % GCDPeriod < INPUT || end % GCDPeriod > (GCDPeriod - OUTPUT))
+    if( end < deadline - OUTPUT )
+    {
+        return 0;
+    }
+    else
     {
         return 1;
     }
-    return 0;
 }
 
 static void vSetTimestamp( xListItem * pxEventListItem)
